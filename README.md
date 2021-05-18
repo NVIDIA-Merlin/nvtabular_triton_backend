@@ -29,14 +29,15 @@
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 # NVTabular C++ Triton Backend
+This repo includes the source code for the NVTabular C++ Triton Backend.
+
 `nvcr.io/nvstaging/merlin/merlin-inference` container includes all the required
 packages and libraries to build the C++ backend from source. Please follow the
 steps below;
 
-Assuming the NVTabular C++ backend repo is cloned and you are in the folder where
-the src folder is located;
-
 ```
+$ git clone https://github.com/NVIDIA-Merlin/nvtabular_triton_backend.git
+$ cd nvtabular_triton_backend/
 $ mkdir build
 $ cd build
 $ cmake ..
@@ -69,4 +70,3 @@ but the listed CMake argument can be used to override.
 * triton-inference-server/backend: -DTRITON_BACKEND_REPO_TAG=[tag]
 * triton-inference-server/core: -DTRITON_CORE_REPO_TAG=[tag]
 * triton-inference-server/common: -DTRITON_COMMON_REPO_TAG=[tag]
-# nvtabular_triton_backend
