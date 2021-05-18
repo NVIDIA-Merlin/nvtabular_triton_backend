@@ -36,6 +36,7 @@ packages and libraries to build the C++ backend from source. Please follow the
 steps below;
 
 ```
+$ conda install -c conda-forge rapidjson pybind11 cmake
 $ git clone https://github.com/NVIDIA-Merlin/nvtabular_triton_backend.git
 $ cd nvtabular_triton_backend/
 $ mkdir build

@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: 3.8
+    - name: Install Dependencies
+      run: |
+        conda install -y -c conda-forge pybind11 rapidjson cmake
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make -j 2
