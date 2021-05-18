@@ -28,7 +28,7 @@
 #define MODELSTATE_H_
 
 #include "triton/backend/backend_common.h"
-#include "utils.h"
+#include "utils.hpp"
 #include <vector>
 
 using namespace rapidjson;

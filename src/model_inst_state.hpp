@@ -27,7 +27,7 @@
 #ifndef MODELINSTSTATE_H_
 #define MODELINSTSTATE_H_
 
-#include "utils.h"
+#include "utils.hpp"
 #include <map>
 #include <vector>
 

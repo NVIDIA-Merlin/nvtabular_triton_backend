@@ -27,15 +27,15 @@
 #include <memory>
 #include <thread>
 #include "triton/backend/backend_common.h"
-#include "nvtabular.h"
+#include "nvtabular.hpp"
 #include <dlfcn.h>
 #include <unordered_map>
 #include <chrono>
 #include <rapidjson/document.h>
 #include <iostream>
 #include <fstream>
-#include "model_state.h"
-#include "model_inst_state.h"
+#include "model_state.hpp"
+#include "model_inst_state.hpp"
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 
@@ -107,12 +107,14 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
        std::to_string(TRITONBACKEND_API_VERSION_MINOR))
           .c_str());
 
+  /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "triton backend API version does not support this backend");
   }
+  */
 
   // The backend configuration may contain information needed by the
   // backend, such a command-line arguments. This backend doesn't use

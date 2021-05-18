@@ -61,7 +61,6 @@ config.pbtxt file
 
 ```
 backend: "nvtabular"
-instance_group [{ kind: KIND_CPU }]
 ```
 
 Note that the following required Triton repositories will be pulled and used in
