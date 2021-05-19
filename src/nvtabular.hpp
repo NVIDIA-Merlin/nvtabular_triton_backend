@@ -125,7 +125,7 @@ public:
 
     py::dict dtypes_py;
     for (auto it = dtypes.begin(); it != dtypes.end(); ++it) {
-      dtypes_py[((std::string)it->first).c_str()] = (std::string)it->second;
+      dtypes_py[py::str(it->first)] = it->second;
     }
 
     py::object nvtabular =
@@ -233,4 +233,3 @@ public:
 }  // namespace backend
 }  // namespace triton
 #endif  // NVTABULAR_H_
-
