@@ -24,8 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef UTILS_H_
+#define UTILS_H_
+
+#include <string>
 
 #include "triton/backend/backend_common.h"
 
@@ -34,7 +36,7 @@ namespace backend {
 namespace nvtabular {
 
 class Utils {
-public:
+ public:
   static std::string ConvertToNumpyType(TRITONSERVER_DataType dtype) {
     if (dtype == TRITONSERVER_TYPE_INVALID)
       return std::string("invalid");
@@ -66,7 +68,7 @@ public:
       return std::string("np.bytes");
   }
 
-  static TRITONSERVER_DataType ConvertToTritonType(std::string &output_dtype) {
+  static TRITONSERVER_DataType ConvertToTritonType(const std::string & output_dtype) {
     if (output_dtype.compare("TYPE_INVALID") == 0)
       return TRITONSERVER_TYPE_INVALID;
     else if (output_dtype.compare("TYPE_BOOL") == 0)
@@ -165,8 +167,8 @@ public:
   }
 };
 
-} // namespace nvtabular
-} // namespace backend
-} // namespace triton
+}  // namespace nvtabular
+}  // namespace backend
+}  // namespace triton
 
-#endif /* UTILS_H */
+#endif  // UTILS_H_

@@ -26,14 +26,20 @@
 
 #ifndef NVTABULAR_H_
 #define NVTABULAR_H_
-
-#include "pybind.hpp"
-#include "triton/backend/backend_common.h"
-#include <exception>
-#include <map>
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
+
+#include <pybind11/embed.h>
+#include <pybind11/numpy.h>
+
+#include <exception>
+#include <map>
+#include <string>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
+
+#include "triton/backend/backend_common.h"
 
 namespace py = pybind11;
 
@@ -42,9 +48,8 @@ namespace backend {
 namespace nvtabular {
 
 class NVTabular {
-
-private:
-  void fill_array_interface(py::dict &ai, const size_t max_size) {
+ private:
+  void fill_array_interface(py::dict & ai, const size_t max_size) {  // NOLINT
     py::list list_desc;
     std::string u("<U");
     u.append(std::to_string(max_size));
@@ -55,7 +60,7 @@ private:
     ai["version"] = 3;
   }
 
-  void fill_array_interface(py::dict &ai, TRITONSERVER_DataType dtype) {
+  void fill_array_interface(py::dict & ai, TRITONSERVER_DataType dtype) {  // NOLINT
     py::list list_desc;
     if (dtype == TRITONSERVER_TYPE_BOOL) {
       ai["typestr"] = "|b1";
@@ -114,8 +119,8 @@ private:
 
 public:
 
-  void Deserialize(std::string &path_workflow,
-                   std::map<std::string, std::string> dtypes) {
+  void Deserialize(const std::string &path_workflow,
+                   const std::map<std::string, std::string> & dtypes) {
     this->dtypes = dtypes;
 
     py::dict dtypes_py;
@@ -134,19 +139,18 @@ public:
   void Transform(const std::vector<std::string> &input_names,
                  const void **input_buffers, const int64_t **input_shapes,
                  TRITONSERVER_DataType *input_dtypes,
-                 std::unordered_map<std::string, size_t> &max_str_sizes,
+                 const std::unordered_map<std::string, size_t> &max_str_sizes,
                  const std::vector<std::string> &output_names) {
-
     py::list all_inputs;
     py::list all_inputs_names;
     for (uint32_t i = 0; i < input_names.size(); ++i) {
       py::dict ai_in;
-      std::tuple<long> shape_in((long)input_shapes[i][0]);
+      std::tuple<int64_t> shape_in((int64_t)input_shapes[i][0]);
       ai_in["shape"] = shape_in;
-      std::tuple<long, bool> data_in((long)*(&input_buffers[i]), false);
+      std::tuple<int64_t, bool> data_in((int64_t)*(&input_buffers[i]), false);
       ai_in["data"] = data_in;
       if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
-        fill_array_interface(ai_in, max_str_sizes[input_names[i]]);
+        fill_array_interface(ai_in, max_str_sizes.at(input_names[i]));
       } else {
         fill_array_interface(ai_in, input_dtypes[i]);
       }
@@ -166,7 +170,6 @@ public:
   void CopyData(void **output_buffers, const uint64_t *output_byte_sizes,
                 const std::vector<std::string> &output_names,
                 const std::vector<TRITONSERVER_DataType> &output_dtypes) {
-
     for (uint32_t i = 0; i < output_names.size(); ++i) {
       if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
         py::array_t<bool> arr =
@@ -205,7 +208,7 @@ public:
             (py::array_t<uint64_t>)output[output_names[i].c_str()];
         memcpy(output_buffers[i], arr.data(), output_byte_sizes[i]);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP16) {
-
+        throw std::invalid_argument("Unhandled dtype: fp16");
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP32) {
         py::array_t<float> arr =
             (py::array_t<float>)output[output_names[i].c_str()];
@@ -221,13 +224,13 @@ public:
 
   py::list GetOutputSizes() { return nt.attr("get_lengths")(); }
 
-private:
+ private:
   py::object nt;
   py::dict output;
 };
 
-} // namespace nvtabular
-} // namespace backend
-} // namespace triton
+}  // namespace nvtabular
+}  // namespace backend
+}  // namespace triton
+#endif  // NVTABULAR_H_
 
-#endif /* NVTABULAR_H_ */

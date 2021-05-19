@@ -20,7 +20,10 @@ jobs:
         python-version: 3.8
     - name: Install Dependencies
       run: |
-        conda install -y -c conda-forge pybind11 rapidjson cmake
+        conda install -y -c conda-forge pybind11 rapidjson cmake cpplint
+    - name: Run cpplint
+      run: |
+        cpplint --linelength=120  --filter=-build/c++11,-build/include_subdir --root=src ./src/*
     - name: Build
       run: |
         mkdir build

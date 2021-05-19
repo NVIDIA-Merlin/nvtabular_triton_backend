@@ -24,14 +24,16 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef MODELSTATE_H_
-#define MODELSTATE_H_
+#ifndef MODEL_STATE_H_
+#define MODEL_STATE_H_
+
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "triton/backend/backend_common.h"
 #include "utils.hpp"
-#include <vector>
 
-using namespace rapidjson;
 
 namespace triton {
 namespace backend {
@@ -44,7 +46,7 @@ namespace nvtabular {
 // TRITONBACKEND_Model.
 //
 class ModelState {
-public:
+ public:
   static TRITONSERVER_Error *Create(TRITONBACKEND_Model *triton_model,
                                     ModelState **state);
 
@@ -72,7 +74,7 @@ public:
 
   TRITONSERVER_Error *ReadInputOutputNames();
 
-private:
+ private:
   ModelState(TRITONSERVER_Server *triton_server,
              TRITONBACKEND_Model *triton_model, const char *name,
              const uint64_t version, const char *path,
@@ -141,7 +143,7 @@ TRITONSERVER_Error *ModelState::Create(TRITONBACKEND_Model *triton_model,
     myfile.close();
   }
 
-  Document document;
+  rapidjson::Document document;
   document.Parse(line.c_str());
   if (document["versions"].HasMember("python")) {
     std::string python_lib = "libpython";
@@ -163,7 +165,7 @@ TRITONSERVER_Error *ModelState::Create(TRITONBACKEND_Model *triton_model,
 
   *state = new ModelState(triton_server, triton_model, model_name,
                           model_version, path, std::move(model_config));
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 ModelState::ModelState(TRITONSERVER_Server *triton_server,
@@ -187,7 +189,7 @@ TRITONSERVER_Error *ModelState::SupportsFirstDimBatching(bool *supports) {
   }
 
   *supports = supports_batching_;
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error *ModelState::CreationDelay() {
@@ -209,7 +211,7 @@ TRITONSERVER_Error *ModelState::CreationDelay() {
           std::chrono::seconds(std::stoi(creation_delay_sec_str)));
     }
   }
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error *ModelState::ReadInputOutputNames() {
@@ -246,11 +248,11 @@ TRITONSERVER_Error *ModelState::ReadInputOutputNames() {
     output_names_.push_back(output_name);
   }
 
-  return nullptr; // success
+  return nullptr;  // success
 }
 
-} // namespace nvtabular
-} // namespace backend
-} // namespace triton
+}  // namespace nvtabular
+}  // namespace backend
+}  // namespace triton
 
-#endif /* MODELSTATE_H_ */
+#endif  // MODEL_STATE_H_

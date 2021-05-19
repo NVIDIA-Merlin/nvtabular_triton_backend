@@ -24,22 +24,23 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <memory>
-#include <thread>
-#include "triton/backend/backend_common.h"
-#include "nvtabular.hpp"
 #include <dlfcn.h>
-#include <unordered_map>
-#include <chrono>
-#include <rapidjson/document.h>
-#include <iostream>
-#include <fstream>
-#include "model_state.hpp"
-#include "model_inst_state.hpp"
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
+#include <rapidjson/document.h>
 
-using namespace rapidjson;
+#include <memory>
+#include <thread>
+#include <unordered_map>
+#include <chrono>
+#include <iostream>
+#include <fstream>
+
+#include "triton/backend/backend_common.h"
+#include "nvtabular.hpp"
+#include "model_state.hpp"
+#include "model_inst_state.hpp"
+#include "pybind.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
 
@@ -78,8 +79,7 @@ extern "C" {
 // should initialize any global state that is intended to be shared
 // across all models and model instances that use the backend.
 TRITONSERVER_Error*
-TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend)
-{
+TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   const char* cname;
   RETURN_IF_ERROR(TRITONBACKEND_BackendName(backend, &cname));
   std::string name(cname);
@@ -173,8 +173,7 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
 // should initialize any state that is intended to be shared across
 // all instances of the model.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
-{
+TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   const char* cname;
   RETURN_IF_ERROR(TRITONBACKEND_ModelName(model, &cname));
   std::string name(cname);
@@ -231,8 +230,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model)
 // is set using TRITONBACKEND_ModelSetState. The backend must free
 // this state and perform any other cleanup.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
-{
+TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model) {
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
@@ -249,8 +247,7 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model)
 // backend should initialize any state that is required for a model
 // instance.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
-{
+TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance) {
   const char* cname;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
   std::string name(cname);
@@ -291,8 +288,7 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance)
 // state is set using TRITONBACKEND_ModelInstanceSetState. The backend
 // must free this state and perform any other cleanup.
 TRITONSERVER_Error*
-TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance)
-{
+TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance) {
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceState(instance, &vstate));
   ModelInstanceState* instance_state =
@@ -382,12 +378,14 @@ TRITONBACKEND_ModelInstanceExecute(
     LOG_MESSAGE(TRITONSERVER_LOG_INFO, info.c_str());
 
     const std::vector<std::string> input_names = model_state->InputNames();
-    TRITONBACKEND_Input* inputs[input_count];
-    TRITONSERVER_DataType input_dtypes[input_count];
-    const int64_t* input_shapes[input_count];
-    uint32_t input_dims_counts[input_count];
-    uint64_t input_byte_sizes[input_count];
-    uint32_t input_buffer_counts[input_count];
+
+    // TODO(benfred): we shouldn't use VLA's
+    TRITONBACKEND_Input* inputs[input_count];  // NOLINT
+    TRITONSERVER_DataType input_dtypes[input_count];  // NOLINT
+    const int64_t* input_shapes[input_count]; // NOLINT.
+    uint32_t input_dims_counts[input_count]; // NOLINT.
+    uint64_t input_byte_sizes[input_count];  // NOLINT.
+    uint32_t input_buffer_counts[input_count]; // NOLINT.
 
     for (uint32_t i = 0; i < input_count; i++) {
       const char* input_name = input_names[i].c_str();
@@ -422,14 +420,14 @@ TRITONBACKEND_ModelInstanceExecute(
     const std::vector<std::string> output_names = model_state->OutputNames();
     const std::vector<TRITONSERVER_DataType> output_dtypes = model_state->OutputDtypes();
     TRITONBACKEND_Output* outputs[output_names.size()];
-    void* output_buffers[output_names.size()];
-    uint64_t output_byte_sizes[output_names.size()];
+    void* output_buffers[output_names.size()];  // NOLINT
+    uint64_t output_byte_sizes[output_names.size()];  // NOLINT
     std::vector<std::vector<wchar_t>*> numpy_input_buffers;
     std::unordered_map<std::string, size_t> max_str_sizes;
 
     for (uint32_t b = 0; b < input_buffer_counts[0]; ++b) {
-      const void* input_buffers[input_count];
-      uint64_t buffer_byte_sizes[input_count];
+      const void* input_buffers[input_count];  // NOLINT
+      uint64_t buffer_byte_sizes[input_count];  // NOLINT
 
       for (uint32_t i = 0; i < input_count; ++i) {
         input_buffers[i] = nullptr;
@@ -599,6 +597,6 @@ TRITONBACKEND_ModelInstanceExecute(
 }
 
 }  // extern "C"
-
-}}}
-
+}  // namespace nvtabular
+}  // namespace backend
+}  // namespace triton
