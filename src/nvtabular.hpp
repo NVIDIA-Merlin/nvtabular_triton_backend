@@ -113,25 +113,14 @@ private:
   std::map<std::string, std::string> dtypes;
 
 public:
-  NVTabular() {
-    Pybind *p = p->getInstance();
-    p->InitPythonInterpreter();
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
-  }
-
-  ~NVTabular() {
-    Pybind *p = p->getInstance();
-    p->FinalizePythonInterpreter();
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is  finalized\n");
-  }
 
   void Deserialize(std::string &path_workflow,
                    std::map<std::string, std::string> dtypes) {
     this->dtypes = dtypes;
 
     py::dict dtypes_py;
-    for (const auto &[name, np_dtype] : dtypes) {
-      dtypes_py[name.c_str()] = np_dtype;
+    for (auto it = dtypes.begin(); it != dtypes.end(); ++it) {
+      dtypes_py[((std::string)it->first).c_str()] = (std::string)it->second;
     }
 
     py::object nvtabular =

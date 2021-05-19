@@ -49,25 +49,22 @@ public:
     if (!inter_started) {
       py::initialize_interpreter();
       inter_started = true;
-      inter_stopped = false;
     }
   }
 
   void FinalizePythonInterpreter() {
-    if (!inter_stopped) {
+    if (inter_started) {
       py::finalize_interpreter();
-      inter_stopped = true;
       inter_started = false;
     }
   }
 
 private:
   static Pybind *inst_;
-  Pybind() : inter_started(false), inter_stopped(true) {}
+  Pybind() : inter_started(false) {}
   Pybind(const Pybind &);
   Pybind &operator=(const Pybind &);
   bool inter_started;
-  bool inter_stopped;
 };
 
 Pybind *Pybind::inst_ = NULL;
