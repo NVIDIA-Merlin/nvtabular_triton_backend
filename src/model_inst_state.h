@@ -24,14 +24,15 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef MODELINSTSTATE_H_
-#define MODELINSTSTATE_H_
+#ifndef MODEL_INST_STATE_H_
+#define MODEL_INST_STATE_H_
 
-#include "utils.h"
 #include <map>
+#include <string>
 #include <vector>
 
-using namespace rapidjson;
+#include "utils.h"
+
 
 namespace triton {
 namespace backend {
@@ -44,7 +45,7 @@ namespace nvtabular {
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
 class ModelInstanceState {
-public:
+ public:
   static TRITONSERVER_Error *
   Create(ModelState *model_state,
          TRITONBACKEND_ModelInstance *triton_model_instance,
@@ -66,7 +67,7 @@ public:
   bool inter_started = false;
   NVTabular nvt;
 
-private:
+ private:
   ModelInstanceState(ModelState *model_state,
                      TRITONBACKEND_ModelInstance *triton_model_instance,
                      const char *name,
@@ -113,7 +114,7 @@ ModelInstanceState::Create(ModelState *model_state,
   }
 
   (*state)->nvt.Deserialize(path_workflow, dtypes);
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 ModelInstanceState::ModelInstanceState(
@@ -123,8 +124,8 @@ ModelInstanceState::ModelInstanceState(
     : model_state_(model_state), triton_model_instance_(triton_model_instance),
       name_(name), kind_(kind), device_id_(device_id) {}
 
-} // namespace nvtabular
-} // namespace backend
-} // namespace triton
+}  // namespace nvtabular
+}  // namespace backend
+}  // namespace triton
 
-#endif /* MODELINSTSTATE_H_ */
+#endif  // MODEL_INST_STATE_H_
