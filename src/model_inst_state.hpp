@@ -45,7 +45,7 @@ namespace nvtabular {
 // State associated with a model instance. An object of this class is
 // created and associated with each TRITONBACKEND_ModelInstance.
 //
-class ModelInstanceState {
+class NVT_LOCAL ModelInstanceState {
  public:
   static TRITONSERVER_Error *
   Create(ModelState *model_state,

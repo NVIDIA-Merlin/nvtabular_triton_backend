@@ -31,6 +31,11 @@
 
 #include "triton/backend/backend_common.h"
 
+// macro to define a class / function as local to this backend
+// (useful for quieting warnings around visibility with pybind objects)
+// https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
+#define NVT_LOCAL __attribute__ ((visibility ("hidden")))
+
 namespace triton {
 namespace backend {
 namespace nvtabular {
@@ -166,7 +171,6 @@ class Utils {
     }
   }
 };
-
 }  // namespace nvtabular
 }  // namespace backend
 }  // namespace triton
