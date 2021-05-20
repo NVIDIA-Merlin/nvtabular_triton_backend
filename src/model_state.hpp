@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef MODEL_STATE_H_
-#define MODEL_STATE_H_
+#ifndef MODEL_STATE_HPP_
+#define MODEL_STATE_HPP_
 
 #include <string>
 #include <utility>
@@ -255,4 +255,4 @@ TRITONSERVER_Error *ModelState::ReadInputOutputNames() {
 }  // namespace backend
 }  // namespace triton
 
-#endif  // MODEL_STATE_H_
+#endif  // MODEL_STATE_HPP_

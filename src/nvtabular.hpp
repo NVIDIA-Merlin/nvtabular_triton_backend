@@ -24,10 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef NVTABULAR_H_
-#define NVTABULAR_H_
-#include <pybind11/embed.h>
-#include <pybind11/numpy.h>
+#ifndef NVTABULAR_HPP_
+#define NVTABULAR_HPP_
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -117,8 +115,7 @@ class NVTabular {
 
   std::map<std::string, std::string> dtypes;
 
-public:
-
+ public:
   void Deserialize(const std::string &path_workflow,
                    const std::map<std::string, std::string> & dtypes) {
     this->dtypes = dtypes;
@@ -232,4 +229,4 @@ public:
 }  // namespace nvtabular
 }  // namespace backend
 }  // namespace triton
-#endif  // NVTABULAR_H_
+#endif  // NVTABULAR_HPP_

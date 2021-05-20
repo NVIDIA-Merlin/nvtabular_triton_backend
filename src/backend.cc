@@ -40,7 +40,6 @@
 #include "nvtabular.hpp"
 #include "model_state.hpp"
 #include "model_inst_state.hpp"
-#include "pybind.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
 
@@ -138,8 +137,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(
       TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
 
-  Pybind *p = p->getInstance();
-  p->InitPythonInterpreter();
+  py::initialize_interpreter();
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
 
   return nullptr;  // success
@@ -149,11 +147,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 // using TRITONBACKEND_BackendSetState. The backend must free this
 // state and perform any other global cleanup.
 TRITONSERVER_Error*
-TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend)
-{
-  //Pybind *p = p->getInstance();
-  //p->FinalizePythonInterpreter();
-  //LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is finalized\n");
+TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
+  // py::finalize_interpreter();
 
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
