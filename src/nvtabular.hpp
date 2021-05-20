@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "triton/backend/backend_common.h"
+#include "utils.hpp"
 
 namespace py = pybind11;
 
@@ -45,7 +46,7 @@ namespace triton {
 namespace backend {
 namespace nvtabular {
 
-class NVTabular {
+class NVT_LOCAL NVTabular {
  private:
   void fill_array_interface(py::dict & ai, const size_t max_size) {  // NOLINT
     py::list list_desc;
