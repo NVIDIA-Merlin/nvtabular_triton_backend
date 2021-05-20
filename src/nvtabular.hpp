@@ -139,6 +139,7 @@ class NVT_LOCAL NVTabular {
                  TRITONSERVER_DataType *input_dtypes,
                  const std::unordered_map<std::string, size_t> &max_str_sizes,
                  const std::vector<std::string> &output_names) {
+    py::gil_scoped_acquire l;
     py::list all_inputs;
     py::list all_inputs_names;
     for (uint32_t i = 0; i < input_names.size(); ++i) {

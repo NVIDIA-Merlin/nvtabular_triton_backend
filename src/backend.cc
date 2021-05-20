@@ -140,6 +140,9 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   py::initialize_interpreter();
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
 
+  // we have to manually release the GIL here otherwise we'll deadlock in future threads
+  PyEval_SaveThread();
+
   return nullptr;  // success
 }
 
@@ -148,7 +151,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 // state and perform any other global cleanup.
 TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
-  // py::finalize_interpreter();
+  py::gil_scoped_acquire l;
+  py::finalize_interpreter();
 
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
