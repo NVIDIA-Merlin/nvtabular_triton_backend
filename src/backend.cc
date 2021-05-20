@@ -37,9 +37,9 @@
 #include <fstream>
 
 #include "triton/backend/backend_common.h"
-#include "nvtabular.h"
-#include "model_state.h"
-#include "model_inst_state.h"
+#include "nvtabular.hpp"
+#include "model_state.hpp"
+#include "model_inst_state.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
 
@@ -106,12 +106,14 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
        std::to_string(TRITONBACKEND_API_VERSION_MINOR))
           .c_str());
 
+  /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "triton backend API version does not support this backend");
   }
+  */
 
   // The backend configuration may contain information needed by the
   // backend, such a command-line arguments. This backend doesn't use
@@ -135,6 +137,9 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(
       TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
 
+  py::initialize_interpreter();
+  LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
+
   return nullptr;  // success
 }
 
@@ -143,6 +148,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 // state and perform any other global cleanup.
 TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
+  // py::finalize_interpreter();
+
   void* vstate;
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
   std::string* state = reinterpret_cast<std::string*>(vstate);

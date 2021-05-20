@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef UTILS_H_
-#define UTILS_H_
+#ifndef UTILS_HPP_
+#define UTILS_HPP_
 
 #include <string>
 
@@ -171,4 +171,4 @@ class Utils {
 }  // namespace backend
 }  // namespace triton
 
-#endif  // UTILS_H_
+#endif  // UTILS_HPP_

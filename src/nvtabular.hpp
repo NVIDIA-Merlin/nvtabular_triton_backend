@@ -24,8 +24,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef NVTABULAR_H_
-#define NVTABULAR_H_
+#ifndef NVTABULAR_HPP_
+#define NVTABULAR_HPP_
+
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 
@@ -115,23 +116,13 @@ class NVTabular {
   std::map<std::string, std::string> dtypes;
 
  public:
-  NVTabular() {
-    py::initialize_interpreter();
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
-  }
-
-  ~NVTabular() {
-    py::finalize_interpreter();
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is  finalized\n");
-  }
-
   void Deserialize(const std::string &path_workflow,
                    const std::map<std::string, std::string> & dtypes) {
     this->dtypes = dtypes;
 
     py::dict dtypes_py;
-    for (const auto &[name, np_dtype] : dtypes) {
-      dtypes_py[name.c_str()] = np_dtype;
+    for (auto it = dtypes.begin(); it != dtypes.end(); ++it) {
+      dtypes_py[py::str(it->first)] = it->second;
     }
 
     py::object nvtabular =
@@ -230,35 +221,6 @@ class NVTabular {
 
   py::list GetOutputSizes() { return nt.attr("get_lengths")(); }
 
-  void test_string() {
-    wchar_t data[10];
-    data[0] = 'Y';
-    data[1] = 'I';
-    data[2] = 'l';
-    data[3] = 'm';
-    data[4] = 'a';
-    data[5] = 'z';
-    data[6] = 'O';
-    data[7] = 'n';
-    data[8] = 'u';
-    data[9] = 'r';
-
-    py::dict ai_in;
-    std::tuple<int64_t> shape_in((int64_t)2);
-    ai_in["shape"] = shape_in;
-    std::tuple<int64_t, bool> data_in((int64_t)*(&data), false);
-    ai_in["data"] = data_in;
-
-    ai_in["typestr"] = "<U6";
-    std::tuple<std::string, std::string> desc("", "<U6");
-    py::list list_desc;
-    list_desc.append(desc);
-    ai_in["descr"] = list_desc;
-    ai_in["version"] = 3;
-
-    nt.attr("test")(ai_in);
-  }
-
  private:
   py::object nt;
   py::dict output;
@@ -267,5 +229,4 @@ class NVTabular {
 }  // namespace nvtabular
 }  // namespace backend
 }  // namespace triton
-#endif  // NVTABULAR_H_
-
+#endif  // NVTABULAR_HPP_

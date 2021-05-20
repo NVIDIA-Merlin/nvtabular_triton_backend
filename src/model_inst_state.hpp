@@ -24,14 +24,15 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef MODEL_INST_STATE_H_
-#define MODEL_INST_STATE_H_
+#ifndef MODEL_INST_STATE_HPP_
+#define MODEL_INST_STATE_HPP_
+
 
 #include <map>
 #include <string>
 #include <vector>
 
-#include "utils.h"
+#include "utils.hpp"
 
 
 namespace triton {
@@ -128,4 +129,4 @@ ModelInstanceState::ModelInstanceState(
 }  // namespace backend
 }  // namespace triton
 
-#endif  // MODEL_INST_STATE_H_
+#endif  // MODEL_INST_STATE_HPP_
