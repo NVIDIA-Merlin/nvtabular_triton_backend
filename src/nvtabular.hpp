@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "triton/backend/backend_common.h"
+#include "utils.hpp"
 
 namespace py = pybind11;
 
