@@ -141,7 +141,7 @@ class Utils {
     uint64_t i = 0;
 
     while (i < len) {
-      size_t curr = (size_t)str[i];
+      size_t curr = static_cast<size_t>(str[i]);
       if (curr > max_len) {
         max_len = curr;
       }
@@ -162,7 +162,7 @@ class Utils {
     uint64_t j = 0;
 
     while (i < len) {
-      size_t curr = (size_t)source[i];
+      size_t curr = static_cast<size_t>(source[i]);
       for (size_t k = 0; k < curr; ++k) {
         dest[j + k] = (wchar_t)source[i + pad_size + k];
       }
