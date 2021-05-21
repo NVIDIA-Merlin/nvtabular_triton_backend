@@ -139,7 +139,6 @@ class NVT_LOCAL NVTabular {
                  TRITONSERVER_DataType *input_dtypes,
                  const std::unordered_map<std::string, size_t> &max_str_sizes,
                  const std::vector<std::string> &output_names) {
-    py::gil_scoped_acquire l;
     py::list all_inputs;
     py::list all_inputs_names;
     for (uint32_t i = 0; i < input_names.size(); ++i) {
@@ -169,7 +168,6 @@ class NVT_LOCAL NVTabular {
   void CopyData(void **output_buffers, const uint64_t *output_byte_sizes,
                 const std::vector<std::string> &output_names,
                 const std::vector<TRITONSERVER_DataType> &output_dtypes) {
-    py::gil_scoped_acquire l;
     for (uint32_t i = 0; i < output_names.size(); ++i) {
       if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
         py::array_t<bool> arr =
@@ -223,7 +221,6 @@ class NVT_LOCAL NVTabular {
   }
 
   py::list GetOutputSizes() {
-    py::gil_scoped_acquire l;
     return nt.attr("get_lengths")();
   }
 

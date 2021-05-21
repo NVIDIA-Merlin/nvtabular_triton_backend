@@ -477,6 +477,7 @@ TRITONBACKEND_ModelInstanceExecute(
         }
       }
 
+      py::gil_scoped_acquire l;
       instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
         input_dtypes, max_str_sizes, output_names);
 
