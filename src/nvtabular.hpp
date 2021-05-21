@@ -47,8 +47,8 @@ namespace backend {
 namespace nvtabular {
 
 class NVT_LOCAL NVTabular {
- private:
-  void fill_array_interface(py::dict & ai, const size_t max_size) {  // NOLINT
+private:
+  void fill_array_interface(py::dict &ai, const size_t max_size) { // NOLINT
     py::list list_desc;
     std::string u("<U");
     u.append(std::to_string(max_size));
@@ -59,7 +59,8 @@ class NVT_LOCAL NVTabular {
     ai["version"] = 3;
   }
 
-  void fill_array_interface(py::dict & ai, TRITONSERVER_DataType dtype) {  // NOLINT
+  void fill_array_interface(py::dict &ai,
+                            TRITONSERVER_DataType dtype) { // NOLINT
     py::list list_desc;
     if (dtype == TRITONSERVER_TYPE_BOOL) {
       ai["typestr"] = "|b1";
@@ -116,9 +117,9 @@ class NVT_LOCAL NVTabular {
 
   std::map<std::string, std::string> dtypes;
 
- public:
+public:
   void Deserialize(const std::string &path_workflow,
-                   const std::map<std::string, std::string> & dtypes) {
+                   const std::map<std::string, std::string> &dtypes) {
     this->dtypes = dtypes;
 
     py::dict dtypes_py;
@@ -145,7 +146,7 @@ class NVT_LOCAL NVTabular {
       py::dict ai_in;
       std::tuple<int64_t> shape_in((int64_t)input_shapes[i][0]);
       ai_in["shape"] = shape_in;
-      std::tuple<int64_t, bool> data_in((int64_t)*(&input_buffers[i]), false);
+      std::tuple<int64_t, bool> data_in((int64_t) * (&input_buffers[i]), false);
       ai_in["data"] = data_in;
       if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
         fill_array_interface(ai_in, max_str_sizes.at(input_names[i]));
@@ -216,18 +217,75 @@ class NVT_LOCAL NVTabular {
             (py::array_t<double>)output[output_names[i].c_str()];
         memcpy(output_buffers[i], arr.data(), output_byte_sizes[i]);
       } else {
+        throw std::invalid_argument("Unhandled dtype");
+      }
+    }
+  }
+
+  void CopyDataToDevice(void **output_buffers, const uint64_t *output_byte_sizes,
+                const std::vector<std::string> &output_names,
+                const std::vector<TRITONSERVER_DataType> &output_dtypes) {
+    for (uint32_t i = 0; i < output_names.size(); ++i) {
+      if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
+        py::array_t<bool> arr =
+            (py::array_t<bool>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT8) {
+        py::array_t<uint8_t> arr =
+            (py::array_t<uint8_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT16) {
+        py::array_t<uint16_t> arr =
+            (py::array_t<uint16_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT32) {
+        py::array_t<uint32_t> arr =
+            (py::array_t<uint32_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT64) {
+        py::array_t<uint64_t> arr =
+            (py::array_t<uint64_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT8) {
+        py::array_t<int8_t> arr =
+            (py::array_t<int8_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT16) {
+        py::array_t<int16_t> arr =
+            (py::array_t<int16_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT32) {
+        py::array_t<int32_t> arr =
+            (py::array_t<int32_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT64) {
+        py::array_t<uint64_t> arr =
+            (py::array_t<uint64_t>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP16) {
+        throw std::invalid_argument("Unhandled dtype: fp16");
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP32) {
+        py::array_t<float> arr =
+            (py::array_t<float>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP64) {
+        py::array_t<double> arr =
+            (py::array_t<double>)output[output_names[i].c_str()];
+        cudaMemcpy(output_buffers[i], arr.data(), output_byte_sizes[i], cudaMemcpyHostToDevice);
+      } else {
+        throw std::invalid_argument("Unhandled dtype");
       }
     }
   }
 
   py::list GetOutputSizes() { return nt.attr("get_lengths")(); }
 
- private:
+private:
   py::object nt;
   py::dict output;
 };
 
-}  // namespace nvtabular
-}  // namespace backend
-}  // namespace triton
-#endif  // NVTABULAR_HPP_
+} // namespace nvtabular
+} // namespace backend
+} // namespace triton
+#endif // NVTABULAR_HPP_

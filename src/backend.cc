@@ -35,6 +35,8 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
+#include <cuda_runtime_api.h>
+#include <cuda.h>
 
 #include "triton/backend/backend_common.h"
 #include "nvtabular.hpp"
@@ -492,7 +494,7 @@ TRITONBACKEND_ModelInstanceExecute(
           continue;
         }
 
-        TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
+        TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_GPU;
         int64_t output_memory_type_id = 0;
         GUARDED_RESPOND_IF_ERROR(
           responses, r,
@@ -500,21 +502,21 @@ TRITONBACKEND_ModelInstanceExecute(
           outputs[i], &output_buffers[i], output_byte_sizes[i], &output_memory_type,
           &output_memory_type_id));
 
-        if ((responses[r] == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
+        if ((responses[r] == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_CPU)) {
           GUARDED_RESPOND_IF_ERROR(
             responses, r,
             TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
-            "failed to create output buffer in CPU memory"));
+            "failed to create output buffer in GPU memory"));
 
           info = (std::string("request ") + std::to_string(r) +
-                  ": failed to create output buffer in CPU memory, error response "
+                  ": failed to create output buffer in GPU memory, error response "
                   "sent").c_str();
           LOG_MESSAGE(TRITONSERVER_LOG_ERROR, info.c_str());
                   continue;
         }
       }
 
-      instance_state->nvt.CopyData(output_buffers, output_byte_sizes, output_names, output_dtypes);
+      instance_state->nvt.CopyDataToDevice(output_buffers, output_byte_sizes, output_names, output_dtypes);
 
       if (responses[r] == nullptr) {
         error = (std::string("request ") + std::to_string(r) +
