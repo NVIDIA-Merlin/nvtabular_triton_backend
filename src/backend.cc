@@ -137,6 +137,16 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(
       TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
 
+  // Force opening of libpython - so that it's available globally for c-extension modules
+  std::stringstream python_lib;
+  python_lib << "libpython" << PY_MAJOR_VERSION << "." << PY_MINOR_VERSION << ".so";
+  void *handle = dlopen(python_lib.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
+  if (!handle) {
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());
+  } else {
+    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Loaded libpython successfully");
+  }
+
   py::initialize_interpreter();
   LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
 
