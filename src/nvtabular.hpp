@@ -169,7 +169,7 @@ class NVT_LOCAL NVTabular {
   void CopyData(void **output_buffers, const uint64_t *output_byte_sizes,
                 const std::vector<std::string> &output_names,
                 const std::vector<TRITONSERVER_DataType> &output_dtypes) {
-	py::gil_scoped_acquire l;
+    py::gil_scoped_acquire l;
     for (uint32_t i = 0; i < output_names.size(); ++i) {
       if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
         py::array_t<bool> arr =
@@ -223,8 +223,8 @@ class NVT_LOCAL NVTabular {
   }
 
   py::list GetOutputSizes() {
-	py::gil_scoped_acquire l;
-	return nt.attr("get_lengths")();
+    py::gil_scoped_acquire l;
+    return nt.attr("get_lengths")();
   }
 
  private:
