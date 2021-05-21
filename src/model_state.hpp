@@ -131,38 +131,6 @@ TRITONSERVER_Error *ModelState::Create(TRITONBACKEND_Model *triton_model,
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelRepository(triton_model, &artifact_type, &path));
 
-  std::string python_version_path(path);
-  python_version_path.append("/");
-  python_version_path.append(std::to_string(model_version));
-  python_version_path.append("/workflow/metadata.json");
-
-  std::string line;
-  std::ifstream myfile(python_version_path.c_str());
-  if (myfile.is_open()) {
-    std::getline(myfile, line);
-    myfile.close();
-  }
-
-  rapidjson::Document document;
-  document.Parse(line.c_str());
-  if (document["versions"].HasMember("python")) {
-    std::string python_lib = "libpython";
-
-    std::string value(document["versions"]["python"].GetString());
-    python_lib.append(value.substr(0, 3));
-    python_lib.append(".so");
-
-    void *handle = dlopen(python_lib.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-    if (!handle) {
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());
-    } else {
-      LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Loaded libpython successfully");
-    }
-  } else {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR,
-                "Python version is not specified in the metada.json");
-  }
-
   *state = new ModelState(triton_server, triton_model, model_name,
                           model_version, path, std::move(model_config));
   return nullptr;  // success
