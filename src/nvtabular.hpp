@@ -278,7 +278,9 @@ public:
     }
   }
 
-  py::list GetOutputSizes() { return nt.attr("get_lengths")(); }
+  py::list GetOutputSizes() {
+    return nt.attr("get_lengths")();
+  }
 
 private:
   py::object nt;

@@ -98,6 +98,7 @@ ModelInstanceState::Create(ModelState *model_state,
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
 
+  py::gil_scoped_acquire l;
   *state = new ModelInstanceState(model_state, triton_model_instance,
                                   instance_name, instance_kind, instance_id);
 
