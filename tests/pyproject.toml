@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+filterwarnings = [
+		'ignore:Call to deprecated create function:DeprecationWarning',
+	]
