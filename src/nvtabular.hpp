@@ -127,7 +127,7 @@ class NVT_LOCAL NVTabular {
     }
 
     py::object nvtabular =
-        py::module_::import("nvtabular.inference.triton.cpp_backend.nvt")
+        py::module_::import("nvtabular.inference.triton.backend_tf")
             .attr("TritonNVTabularModel");
 
     nt = nvtabular();
