@@ -142,7 +142,10 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   python_lib << "libpython" << PY_MAJOR_VERSION << "." << PY_MINOR_VERSION << ".so";
   void *handle = dlopen(python_lib.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
   if (!handle) {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());    
+    return TRITONSERVER_ErrorNew(
+       TRITONSERVER_ERROR_INTERNAL,
+       dlerror());
   } else {
     LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Loaded libpython successfully");
   }
@@ -478,10 +481,26 @@ TRITONBACKEND_ModelInstanceExecute(
       }
 
       py::gil_scoped_acquire l;
-      instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
-        input_dtypes, max_str_sizes, output_names);
+      try {
+        instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
+          input_dtypes, max_str_sizes, output_names);
+      } catch (py::error_already_set &e) {
+        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
+        return TRITONSERVER_ErrorNew(
+           TRITONSERVER_ERROR_INTERNAL,
+           "Error in the Transform python function");
+      }
+        
+      py::list lengths;
+      try {
+        lengths = instance_state->nvt.GetOutputSizes();
+      } catch (py::error_already_set &e) {
+        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
+        return TRITONSERVER_ErrorNew(
+           TRITONSERVER_ERROR_INTERNAL,
+           "Error in the GetOutputSizes python function");
+      }
 
-      py::list lengths = instance_state->nvt.GetOutputSizes();
       for (uint32_t i = 0; i < output_names.size(); ++i) {
         const char* output_name = output_names[i].c_str();
         int64_t output_length = lengths[i].cast<int64_t>();
