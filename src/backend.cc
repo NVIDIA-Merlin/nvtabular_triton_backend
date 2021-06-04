@@ -142,7 +142,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   python_lib << "libpython" << PY_MAJOR_VERSION << "." << PY_MINOR_VERSION << ".so";
   void *handle = dlopen(python_lib.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
   if (!handle) {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());    
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());  
     return TRITONSERVER_ErrorNew(
        TRITONSERVER_ERROR_INTERNAL,
        dlerror());
@@ -490,7 +490,7 @@ TRITONBACKEND_ModelInstanceExecute(
            TRITONSERVER_ERROR_INTERNAL,
            "Error in the Transform python function");
       }
-        
+
       py::list lengths;
       try {
         lengths = instance_state->nvt.GetOutputSizes();
