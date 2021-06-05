@@ -494,7 +494,7 @@ TRITONBACKEND_ModelInstanceExecute(
       py::list lengths;
       try {
         lengths = instance_state->nvt.GetOutputSizes();
-      } catch (py::error_already_set &e) {
+      } catch (const py::error_already_set &e) {
         LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
         return TRITONSERVER_ErrorNew(
            TRITONSERVER_ERROR_INTERNAL,
