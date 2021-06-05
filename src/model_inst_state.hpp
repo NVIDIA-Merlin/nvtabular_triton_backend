@@ -117,7 +117,7 @@ ModelInstanceState::Create(ModelState *model_state,
 
   try {
     (*state)->nvt.Deserialize(path_workflow, dtypes);
-  } catch (py::error_already_set &e) {
+  } catch (const py::error_already_set &e) {
     LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
     return TRITONSERVER_ErrorNew(
        TRITONSERVER_ERROR_INTERNAL,
