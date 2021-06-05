@@ -484,7 +484,7 @@ TRITONBACKEND_ModelInstanceExecute(
       try {
         instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
           input_dtypes, max_str_sizes, output_names);
-      } catch (py::error_already_set &e) {
+      } catch (const py::error_already_set &e) {
         LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
         return TRITONSERVER_ErrorNew(
            TRITONSERVER_ERROR_INTERNAL,
