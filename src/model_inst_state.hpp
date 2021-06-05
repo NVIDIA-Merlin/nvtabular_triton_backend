@@ -121,7 +121,7 @@ ModelInstanceState::Create(ModelState *model_state,
     LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
     return TRITONSERVER_ErrorNew(
        TRITONSERVER_ERROR_INTERNAL,
-       "triton backend API version does not support this backend");
+       e.what());
   }
   return nullptr;  // success
 }
