@@ -115,7 +115,14 @@ ModelInstanceState::Create(ModelState *model_state,
         Utils::ConvertToNumpyType(triton_dtypes[i]);
   }
 
-  (*state)->nvt.Deserialize(path_workflow, dtypes);
+  try {
+    (*state)->nvt.Deserialize(path_workflow, dtypes);
+  } catch (const py::error_already_set &e) {
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
+    return TRITONSERVER_ErrorNew(
+       TRITONSERVER_ERROR_INTERNAL,
+       e.what());
+  }
   return nullptr;  // success
 }
 
