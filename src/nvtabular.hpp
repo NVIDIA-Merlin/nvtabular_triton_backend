@@ -143,7 +143,7 @@ class NVT_LOCAL NVTabular {
     py::list all_inputs_names;
     for (uint32_t i = 0; i < input_names.size(); ++i) {
       py::dict ai_in;
-        
+
       std::tuple<int64_t> shape_in(static_cast<int64_t>(input_shapes[i][0]));
       ai_in["shape"] = shape_in;
       std::tuple<int64_t, bool> data_in((int64_t)*(&input_buffers[i]), false);
