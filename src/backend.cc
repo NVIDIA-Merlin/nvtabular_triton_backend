@@ -40,6 +40,7 @@
 #include "nvtabular.hpp"
 #include "model_state.hpp"
 #include "model_inst_state.hpp"
+#include "triton_utils.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
 
@@ -83,9 +84,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(TRITONBACKEND_BackendName(backend, &cname));
   std::string name(cname);
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_Initialize: ") + name).c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_Initialize: " << name;
 
   // We should check the backend API version that Triton supports
   // vs. what this backend was compiled against.
@@ -93,18 +92,11 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(
       TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("Triton TRITONBACKEND API version: ") +
-       std::to_string(api_version_major) + "." +
-       std::to_string(api_version_minor))
-          .c_str());
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("'") + name + "' TRITONBACKEND API version: " +
-       std::to_string(TRITONBACKEND_API_VERSION_MAJOR) + "." +
-       std::to_string(TRITONBACKEND_API_VERSION_MINOR))
-          .c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "Triton TRITONBACKEND API version: " << api_version_major << "."
+    << api_version_minor;
+
+  LOG(TRITONSERVER_LOG_INFO) << "'" << name << "' TRITONBACKEND API version: " <<
+    TRITONBACKEND_API_VERSION_MAJOR << "." << TRITONBACKEND_API_VERSION_MINOR;
 
   /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
@@ -126,9 +118,8 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   size_t byte_size;
   RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(
       backend_config_message, &buffer, &byte_size));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("backend configuration:\n") + buffer).c_str());
+
+  LOG(TRITONSERVER_LOG_INFO) << "backend configuration:\n" << buffer;
 
   // If we have any global backend state we create and set it here. We
   // don't need anything for this backend but for demonstration
@@ -142,7 +133,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   python_lib << "libpython" << PY_MAJOR_VERSION << "." << PY_MINOR_VERSION << ".so";
   void *handle = dlopen(python_lib.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
   if (!handle) {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, dlerror());
+    LOG(TRITONSERVER_LOG_INFO) << "Failed to dlopen '" << python_lib.str() << "': " << dlerror();
     return TRITONSERVER_ErrorNew(
        TRITONSERVER_ERROR_INTERNAL,
        dlerror());
@@ -171,10 +162,7 @@ TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
   std::string* state = reinterpret_cast<std::string*>(vstate);
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_Finalize: state is '") + *state + "'")
-          .c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_Finalize: state is '" << *state << "'";
 
   delete state;
 
@@ -193,11 +181,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   uint64_t version;
   RETURN_IF_ERROR(TRITONBACKEND_ModelVersion(model, &version));
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_ModelInitialize: ") + name + " (version " +
-       std::to_string(version) + ")")
-          .c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelInitialize: " << name << " (version " <<
+    version << ")";
 
   // Can get location of the model artifacts. Normally we would need
   // to check the artifact type to make sure it was something we can
@@ -208,9 +193,8 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   const char* clocation;
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelRepository(model, &artifact_type, &clocation));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("Repository location: ") + clocation).c_str());
+
+  LOG(TRITONSERVER_LOG_INFO) << "Repository location "  << clocation;
 
   // The model can access the backend as well... here we can access
   // the backend global state.
@@ -221,9 +205,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
   std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("backend state is '") + *backend_state + "'").c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "backend state is '" << *backend_state << "'";
 
   // With each model we create a ModelState object and associate it
   // with the TRITONBACKEND_Model.
@@ -247,9 +229,7 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model) {
   RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
   ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO, "TRITONBACKEND_ModelFinalize: delete model state");
-
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelFinalize: delete model state";
   delete model_state;
 
   return nullptr;  // success
@@ -269,12 +249,8 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance) {
   TRITONSERVER_InstanceGroupKind kind;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceKind(instance, &kind));
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("TRITONBACKEND_ModelInstanceInitialize: ") + name + " (" +
-       TRITONSERVER_InstanceGroupKindString(kind) + " device " +
-       std::to_string(device_id) + ")")
-          .c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelInstanceInitialize: " << name << " ("
+       << TRITONSERVER_InstanceGroupKindString(kind) << " device " << device_id << ")";
 
   // The instance can access the corresponding model as well... here
   // we get the model and from that get the model's state.
@@ -306,9 +282,7 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance) {
   ModelInstanceState* instance_state =
       reinterpret_cast<ModelInstanceState*>(vstate);
 
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      "TRITONBACKEND_ModelInstanceFinalize: delete instance state");
+  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelInstanceFinalize: delete instance state";
 
   delete instance_state;
 
@@ -326,10 +300,8 @@ TRITONBACKEND_ModelInstanceExecute(
 
   ModelState* model_state = instance_state->StateForModel();
 
-  std::string info = (std::string("model ") + model_state->Name() + ", instance " +
-        instance_state->Name() + ", executing " + std::to_string(request_count) +
-        " requests").c_str();
-  LOG_MESSAGE(TRITONSERVER_LOG_INFO, info.c_str());
+  LOG(TRITONSERVER_LOG_INFO) << "model " << model_state->Name() << ", instance " <<
+    instance_state->Name() << ", executing " << request_count << " requests";
 
   bool supports_batching = false;
   RETURN_IF_ERROR(model_state->SupportsFirstDimBatching(&supports_batching));
@@ -375,20 +347,14 @@ TRITONBACKEND_ModelInstanceExecute(
       TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
 
     if (responses[r] == nullptr) {
-      error = (std::string("request ") + std::to_string(r) +
-              ": failed to read request input/output counts, error response sent")
-                 .c_str();
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
+      LOG(TRITONSERVER_LOG_ERROR) << "request " << r
+        << ": failed to read request input/output counts, error response sent";
       continue;
     }
 
-    info = (std::string("request ") + std::to_string(r) + ": id = \"" +
-            request_id + "\", correlation_id = " + std::to_string(correlation_id) +
-            ", input_count = " + std::to_string(input_count) +
-            ", requested_output_count = " + std::to_string(requested_output_count))
-               .c_str();
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, info.c_str());
-
+    LOG(TRITONSERVER_LOG_INFO) << "request " << r << ": id = '"  << request_id
+      << "', correlation_id = " << correlation_id << ", input_count " << input_count
+      << ", requested_output_count = " << requested_output_count;
     const std::vector<std::string> input_names = model_state->InputNames();
 
     // TODO(benfred): we shouldn't use VLA's
@@ -411,22 +377,10 @@ TRITONBACKEND_ModelInstanceExecute(
           &input_dims_counts[i], &input_byte_sizes[i], &input_buffer_counts[i]));
 
       if (responses[r] == nullptr) {
-        error = (std::string("request ") + std::to_string(r) +
-                ": failed to read input properties, error response sent")
-                   .c_str();
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
+        LOG(TRITONSERVER_LOG_ERROR) << "request " << r
+          << " : failed to read input properties, rror response sent";
         continue;
       }
-
-      /*
-      info = (std::string("\tinput ") + input_name +
-              ": datatype = " + TRITONSERVER_DataTypeString(input_dtypes[i]) +
-              ", shape = " + backend::ShapeToString(input_shapes[i], input_dims_counts[i]) +
-              ", byte_size = " + std::to_string(input_byte_sizes[i]) +
-              ", buffer_count = " + std::to_string(input_buffer_counts[i]))
-                 .c_str();
-      LOG_MESSAGE(TRITONSERVER_LOG_INFO, info.c_str());
-      */
     }
 
     const std::vector<std::string> output_names = model_state->OutputNames();
@@ -540,11 +494,9 @@ TRITONBACKEND_ModelInstanceExecute(
             TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
             "failed to create output buffer in CPU memory"));
 
-          info = (std::string("request ") + std::to_string(r) +
-                  ": failed to create output buffer in CPU memory, error response "
-                  "sent").c_str();
-          LOG_MESSAGE(TRITONSERVER_LOG_ERROR, info.c_str());
-                  continue;
+          LOG(TRITONSERVER_LOG_ERROR) << "request " << r
+            <<  ": failed to create output buffer in CPU memory, error response sent";
+          continue;
         }
       }
 

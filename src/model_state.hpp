@@ -33,6 +33,7 @@
 
 #include "triton/backend/backend_common.h"
 #include "utils.hpp"
+#include "triton_utils.hpp"
 
 
 namespace triton {
@@ -171,10 +172,7 @@ TRITONSERVER_Error *ModelState::CreationDelay() {
       std::string creation_delay_sec_str;
       RETURN_IF_ERROR(creation_delay_sec.MemberAsString(
           "string_value", &creation_delay_sec_str));
-      LOG_MESSAGE(
-          TRITONSERVER_LOG_INFO,
-          (std::string("Creation delay is set to : ") + creation_delay_sec_str)
-              .c_str());
+      LOG(TRITONSERVER_LOG_INFO) << "Creation delay is set to : " << creation_delay_sec_str;
       std::this_thread::sleep_for(
           std::chrono::seconds(std::stoi(creation_delay_sec_str)));
     }
@@ -186,10 +184,7 @@ TRITONSERVER_Error *ModelState::ReadInputOutputNames() {
   // We have the json DOM for the model configuration...
   common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERROR(model_config_.PrettyWrite(&buffer));
-  LOG_MESSAGE(
-      TRITONSERVER_LOG_INFO,
-      (std::string("model configuration:\n") + buffer.Contents()).c_str());
-
+  LOG(TRITONSERVER_LOG_INFO) << "model configuration:\n" << buffer.Contents();
   common::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
   RETURN_IF_ERROR(model_config_.MemberAsArray("output", &outputs));
