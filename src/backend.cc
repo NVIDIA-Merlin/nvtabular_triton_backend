@@ -340,13 +340,12 @@ TRITONBACKEND_ModelInstanceExecute(
       << ", requested_output_count = " << requested_output_count;
     const std::vector<std::string> input_names = model_state->InputNames();
 
-    // TODO(benfred): we shouldn't use VLA's
-    TRITONBACKEND_Input* inputs[input_count];  // NOLINT
-    TRITONSERVER_DataType input_dtypes[input_count];  // NOLINT
-    const int64_t* input_shapes[input_count]; // NOLINT.
-    uint32_t input_dims_counts[input_count]; // NOLINT.
-    uint64_t input_byte_sizes[input_count];  // NOLINT.
-    uint32_t input_buffer_counts[input_count]; // NOLINT.
+    std::vector<TRITONBACKEND_Input*> inputs(input_count);
+    std::vector<TRITONSERVER_DataType> input_dtypes(input_count);
+    std::vector<const int64_t*> input_shapes(input_count);
+    std::vector<uint32_t> input_dims_counts(input_count);
+    std::vector<uint64_t> input_byte_sizes(input_count);
+    std::vector<uint32_t> input_buffer_counts(input_count);
 
     for (uint32_t i = 0; i < input_count; i++) {
       const char* input_name = input_names[i].c_str();
@@ -368,15 +367,15 @@ TRITONBACKEND_ModelInstanceExecute(
 
     const std::vector<std::string> output_names = model_state->OutputNames();
     const std::vector<TRITONSERVER_DataType> output_dtypes = model_state->OutputDtypes();
-    TRITONBACKEND_Output* outputs[output_names.size()];
-    void* output_buffers[output_names.size()];  // NOLINT
-    uint64_t output_byte_sizes[output_names.size()];  // NOLINT
+    std::vector<TRITONBACKEND_Output*> outputs(output_names.size());
+    std::vector<void*> output_buffers(output_names.size());
+    std::vector<uint64_t> output_byte_sizes(output_names.size());
     std::vector<std::vector<wchar_t>*> numpy_input_buffers;
     std::unordered_map<std::string, size_t> max_str_sizes;
 
     for (uint32_t b = 0; b < input_buffer_counts[0]; ++b) {
-      const void* input_buffers[input_count];  // NOLINT
-      uint64_t buffer_byte_sizes[input_count];  // NOLINT
+      std::vector<const void*> input_buffers(input_count);
+      std::vector<uint64_t> buffer_byte_sizes(input_count);
 
       for (uint32_t i = 0; i < input_count; ++i) {
         input_buffers[i] = nullptr;
@@ -394,7 +393,8 @@ TRITONBACKEND_ModelInstanceExecute(
             &input_memory_type_id));
 
         if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
-          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
+          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer),
+                                                   buffer_byte_sizes[i]);
           max_str_sizes[input_names[i]] = max_size;
           size_t nif_size = max_size * input_shapes[i][0];
           std::vector<wchar_t>* numpy_input_buffer = new std::vector<wchar_t>(nif_size, '\0');
