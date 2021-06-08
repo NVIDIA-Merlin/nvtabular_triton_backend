@@ -36,6 +36,22 @@
 // https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
 #define NVT_LOCAL __attribute__ ((visibility ("hidden")))
 
+#define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
+  do {                                                                  \
+    if ((RESPONSES)[IDX] != nullptr) {                                  \
+      TRITONSERVER_Error* err__ = (X);                                  \
+      if (err__ != nullptr) {                                           \
+        LOG_IF_ERROR(                                                   \
+            TRITONBACKEND_ResponseSend(                                 \
+                (RESPONSES)[IDX], TRITONSERVER_RESPONSE_COMPLETE_FINAL, \
+                err__),                                                 \
+            "failed to send error response");                           \
+        (RESPONSES)[IDX] = nullptr;                                     \
+        TRITONSERVER_ErrorDelete(err__);                                \
+      }                                                                 \
+    }                                                                   \
+  } while (false)
+
 namespace triton {
 namespace backend {
 namespace nvtabular {
@@ -164,7 +180,7 @@ class Utils {
     while (i < len) {
       size_t curr = static_cast<size_t>(source[i]);
       for (size_t k = 0; k < curr; ++k) {
-        dest[j + k] = (wchar_t)source[i + pad_size + k];
+        dest[j + k] = static_cast<wchar_t>(source[i + pad_size + k]);
       }
       i += pad_size + curr;
       j += elem_len;

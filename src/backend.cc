@@ -40,6 +40,7 @@
 #include "nvtabular.hpp"
 #include "model_state.hpp"
 #include "model_inst_state.hpp"
+#include "utils.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
 
@@ -54,23 +55,6 @@ namespace triton { namespace backend { namespace nvtabular {
 // match. The backend simply responds with the output tensor equal to
 // the input tensor.
 //
-
-#define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
-  do {                                                                  \
-    if ((RESPONSES)[IDX] != nullptr) {                                  \
-      TRITONSERVER_Error* err__ = (X);                                  \
-      if (err__ != nullptr) {                                           \
-        LOG_IF_ERROR(                                                   \
-            TRITONBACKEND_ResponseSend(                                 \
-                (RESPONSES)[IDX], TRITONSERVER_RESPONSE_COMPLETE_FINAL, \
-                err__),                                                 \
-            "failed to send error response");                           \
-        (RESPONSES)[IDX] = nullptr;                                     \
-        TRITONSERVER_ErrorDelete(err__);                                \
-      }                                                                 \
-    }                                                                   \
-  } while (false)
-
 
 extern "C" {
 
@@ -231,7 +215,6 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
-
 
   RETURN_IF_ERROR(model_state->ReadInputOutputNames());
 
@@ -457,15 +440,14 @@ TRITONBACKEND_ModelInstanceExecute(
             &input_memory_type_id));
 
         if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
-          size_t max_size = Utils::GetMaxStringLen((const unsigned char*)input_buffer, buffer_byte_sizes[i]);
-
+          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
           max_str_sizes[input_names[i]] = max_size;
           size_t nif_size = max_size * input_shapes[i][0];
           std::vector<wchar_t>* numpy_input_buffer = new std::vector<wchar_t>(nif_size, '\0');
           numpy_input_buffers.push_back(numpy_input_buffer);
 
-          Utils::ConstructNumpyStringArray(numpy_input_buffer->data(), (uint64_t)max_size,
-              (const unsigned char*)input_buffer, buffer_byte_sizes[i]);
+          Utils::ConstructNumpyStringArray(numpy_input_buffer->data(), static_cast<uint64_t>(max_size),
+              reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
           input_buffers[i] = numpy_input_buffer->data();
         } else {
           input_buffers[i] = input_buffer;
