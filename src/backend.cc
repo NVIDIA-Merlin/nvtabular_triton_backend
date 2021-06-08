@@ -378,7 +378,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
       if (responses[r] == nullptr) {
         LOG(TRITONSERVER_LOG_ERROR) << "request " << r
-          << " : failed to read input properties, rror response sent";
+          << " : failed to read input properties, error response sent";
         continue;
       }
     }
