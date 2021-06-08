@@ -98,14 +98,12 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   LOG(TRITONSERVER_LOG_INFO) << "'" << name << "' TRITONBACKEND API version: " <<
     TRITONBACKEND_API_VERSION_MAJOR << "." << TRITONBACKEND_API_VERSION_MINOR;
 
-  /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "triton backend API version does not support this backend");
   }
-  */
 
   // The backend configuration may contain information needed by the
   // backend, such a command-line arguments. This backend doesn't use
@@ -120,13 +118,6 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
       backend_config_message, &buffer, &byte_size));
 
   LOG(TRITONSERVER_LOG_INFO) << "backend configuration:\n" << buffer;
-
-  // If we have any global backend state we create and set it here. We
-  // don't need anything for this backend but for demonstration
-  // purposes we just create something...
-  std::string* state = new std::string("backend state");
-  RETURN_IF_ERROR(
-      TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(state)));
 
   // Force opening of libpython - so that it's available globally for c-extension modules
   std::stringstream python_lib;
@@ -157,15 +148,6 @@ TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
   py::gil_scoped_acquire l;
   py::finalize_interpreter();
-
-  void* vstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vstate));
-  std::string* state = reinterpret_cast<std::string*>(vstate);
-
-  LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_Finalize: state is '" << *state << "'";
-
-  delete state;
-
   return nullptr;  // success
 }
 
@@ -201,19 +183,12 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   TRITONBACKEND_Backend* backend;
   RETURN_IF_ERROR(TRITONBACKEND_ModelBackend(model, &backend));
 
-  void* vbackendstate;
-  RETURN_IF_ERROR(TRITONBACKEND_BackendState(backend, &vbackendstate));
-  std::string* backend_state = reinterpret_cast<std::string*>(vbackendstate);
-
-  LOG(TRITONSERVER_LOG_INFO) << "backend state is '" << *backend_state << "'";
-
   // With each model we create a ModelState object and associate it
   // with the TRITONBACKEND_Model.
   ModelState* model_state;
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));
   RETURN_IF_ERROR(
       TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
-
 
   RETURN_IF_ERROR(model_state->ReadInputOutputNames());
 
@@ -355,7 +330,7 @@ TRITONBACKEND_ModelInstanceExecute(
     LOG(TRITONSERVER_LOG_INFO) << "request " << r << ": id = '"  << request_id
       << "', correlation_id = " << correlation_id << ", input_count " << input_count
       << ", requested_output_count = " << requested_output_count;
-    const std::vector<std::string> input_names = model_state->InputNames();
+    const std::vector<std::string> & input_names = model_state->InputNames();
 
     // TODO(benfred): we shouldn't use VLA's
     TRITONBACKEND_Input* inputs[input_count];  // NOLINT
@@ -383,12 +358,12 @@ TRITONBACKEND_ModelInstanceExecute(
       }
     }
 
-    const std::vector<std::string> output_names = model_state->OutputNames();
-    const std::vector<TRITONSERVER_DataType> output_dtypes = model_state->OutputDtypes();
+    const std::vector<std::string> & output_names = model_state->OutputNames();
+    const std::vector<TRITONSERVER_DataType> & output_dtypes = model_state->OutputDtypes();
     TRITONBACKEND_Output* outputs[output_names.size()];
     void* output_buffers[output_names.size()];  // NOLINT
     uint64_t output_byte_sizes[output_names.size()];  // NOLINT
-    std::vector<std::vector<wchar_t>*> numpy_input_buffers;
+    std::vector<std::unique_ptr<std::vector<wchar_t>>> numpy_input_buffers;
     std::unordered_map<std::string, size_t> max_str_sizes;
 
     for (uint32_t b = 0; b < input_buffer_counts[0]; ++b) {
@@ -415,12 +390,12 @@ TRITONBACKEND_ModelInstanceExecute(
 
           max_str_sizes[input_names[i]] = max_size;
           size_t nif_size = max_size * input_shapes[i][0];
-          std::vector<wchar_t>* numpy_input_buffer = new std::vector<wchar_t>(nif_size, '\0');
-          numpy_input_buffers.push_back(numpy_input_buffer);
 
+          std::unique_ptr<std::vector<wchar_t>> numpy_input_buffer(new std::vector<wchar_t>(nif_size, '\0'));
           Utils::ConstructNumpyStringArray(numpy_input_buffer->data(), (uint64_t)max_size,
               (const unsigned char*)input_buffer, buffer_byte_sizes[i]);
           input_buffers[i] = numpy_input_buffer->data();
+          numpy_input_buffers.push_back(std::move(numpy_input_buffer));
         } else {
           input_buffers[i] = input_buffer;
         }
@@ -467,11 +442,11 @@ TRITONBACKEND_ModelInstanceExecute(
         batch_shape.push_back(output_width);
 
         TRITONBACKEND_Response* response = responses[r];
-          GUARDED_RESPOND_IF_ERROR(
-            responses, r,
-            TRITONBACKEND_ResponseOutput(
-              response, &outputs[i], output_name, output_dtypes[i],
-              batch_shape.data(), batch_shape.size()));
+        GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_ResponseOutput(
+            response, &outputs[i], output_name, output_dtypes[i],
+            batch_shape.data(), batch_shape.size()));
 
         if (responses[r] == nullptr) {
             error = (std::string("request ") + std::to_string(r) +
@@ -517,23 +492,6 @@ TRITONBACKEND_ModelInstanceExecute(
       total_batch_size++;
     }
 
-    for (size_t i = 0; i < numpy_input_buffers.size(); ++i) {
-      delete numpy_input_buffers[i];
-    }
-
-    LOG_IF_ERROR(
-      TRITONBACKEND_ResponseSetStringParameter(
-        responses[r], "param0", "an example string parameter"),
-        "failed setting string parameter");
-
-    LOG_IF_ERROR(
-      TRITONBACKEND_ResponseSetIntParameter(responses[r], "param1", 42),
-        "failed setting integer parameter");
-
-    LOG_IF_ERROR(
-      TRITONBACKEND_ResponseSetBoolParameter(responses[r], "param2", false),
-        "failed setting boolean parameter");
-
     LOG_IF_ERROR(
       TRITONBACKEND_ResponseSend(
         responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
@@ -573,7 +531,6 @@ TRITONBACKEND_ModelInstanceExecute(
         "failed releasing request");
   }
 
-  // LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Request successfully completed");
   return nullptr;  // success
 }
 
