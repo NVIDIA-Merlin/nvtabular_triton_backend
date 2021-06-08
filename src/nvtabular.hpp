@@ -134,16 +134,17 @@ class NVT_LOCAL NVTabular {
     nt.attr("initialize")(path_workflow.data(), dtypes_py);
   }
 
-  void Transform(const std::vector<std::string> &input_names,
-                 const void **input_buffers, const int64_t **input_shapes,
-                 TRITONSERVER_DataType *input_dtypes,
-                 const std::unordered_map<std::string, size_t> &max_str_sizes,
-                 const std::vector<std::string> &output_names) {
+  void Transform(const std::vector<std::string>& input_names,
+                 const std::vector<const void*>& input_buffers,
+                 const std::vector<const int64_t*>& input_shapes,
+                 const std::vector<TRITONSERVER_DataType>& input_dtypes,
+                 const std::unordered_map<std::string, size_t>& max_str_sizes,
+                 const std::vector<std::string>& output_names) {
     py::list all_inputs;
     py::list all_inputs_names;
     for (uint32_t i = 0; i < input_names.size(); ++i) {
       py::dict ai_in;
-      std::tuple<int64_t> shape_in((int64_t)input_shapes[i][0]);
+      std::tuple<int64_t> shape_in(static_cast<int64_t>(input_shapes[i][0]));
       ai_in["shape"] = shape_in;
       std::tuple<int64_t, bool> data_in((int64_t)*(&input_buffers[i]), false);
       ai_in["data"] = data_in;
@@ -165,7 +166,8 @@ class NVT_LOCAL NVTabular {
         nt.attr("transform")(all_inputs_names, all_inputs, all_output_names);
   }
 
-  void CopyData(void **output_buffers, const uint64_t *output_byte_sizes,
+  void CopyData(const std::vector<void*>& output_buffers,
+                const std::vector<uint64_t>& output_byte_sizes,
                 const std::vector<std::string> &output_names,
                 const std::vector<TRITONSERVER_DataType> &output_dtypes) {
     for (uint32_t i = 0; i < output_names.size(); ++i) {
