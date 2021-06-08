@@ -394,7 +394,8 @@ TRITONBACKEND_ModelInstanceExecute(
             &input_memory_type_id));
 
         if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
-          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
+          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer),
+                                                   buffer_byte_sizes[i]);
           max_str_sizes[input_names[i]] = max_size;
           size_t nif_size = max_size * input_shapes[i][0];
           std::vector<wchar_t>* numpy_input_buffer = new std::vector<wchar_t>(nif_size, '\0');
