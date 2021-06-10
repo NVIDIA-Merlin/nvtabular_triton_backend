@@ -162,8 +162,10 @@ class NVT_LOCAL NVTabular {
       all_output_names.append(output_names[i]);
     }
 
-    output =
+    py::tuple o =
         nt.attr("transform")(all_inputs_names, all_inputs, all_output_names);
+    output = o[0];
+    lengths = o[1];
   }
 
   void CopyData(const std::vector<void*>& output_buffers,
@@ -223,12 +225,13 @@ class NVT_LOCAL NVTabular {
   }
 
   py::list GetOutputSizes() {
-    return nt.attr("get_lengths")();
+    return lengths;
   }
 
  private:
   py::object nt;
   py::dict output;
+  py::list lengths;
 };
 
 }  // namespace nvtabular
