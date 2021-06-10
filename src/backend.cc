@@ -343,9 +343,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
     const std::vector<std::string> & output_names = model_state->OutputNames();
     const std::vector<TRITONSERVER_DataType> & output_dtypes = model_state->OutputDtypes();
-    std::vector<TRITONBACKEND_Output*> outputs(output_names.size());
-    std::vector<void*> output_buffers(output_names.size());
-    std::vector<uint64_t> output_byte_sizes(output_names.size());
+    
     std::vector<std::unique_ptr<std::vector<wchar_t>>> numpy_input_buffers;
     std::unordered_map<std::string, size_t> max_str_sizes;
 
@@ -394,79 +392,17 @@ TRITONBACKEND_ModelInstanceExecute(
 
       py::gil_scoped_acquire l;
       try {
-        instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
-          input_dtypes, max_str_sizes, output_names);
+        TRITONSERVER_Error* err_trans = instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
+          input_dtypes, max_str_sizes, output_names, output_dtypes, responses[r]);
+        if (err_trans != nullptr)
+          return err_trans;
       } catch (const py::error_already_set &e) {
         LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
         return TRITONSERVER_ErrorNew(
            TRITONSERVER_ERROR_INTERNAL,
            e.what());
       }
-
-      py::list lengths;
-      try {
-        lengths = instance_state->nvt.GetOutputSizes();
-      } catch (const py::error_already_set &e) {
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
-        return TRITONSERVER_ErrorNew(
-           TRITONSERVER_ERROR_INTERNAL,
-           e.what());
-      }
-
-      for (uint32_t i = 0; i < output_names.size(); ++i) {
-        const char* output_name = output_names[i].c_str();
-        int64_t output_length = lengths[i].cast<int64_t>();
-        int64_t output_width = 1;
-        output_byte_sizes[i] = output_length * output_width *
-            Utils::GetTritonTypeByteSize(output_dtypes[i]);
-
-        std::vector<int64_t> batch_shape;
-        batch_shape.push_back(output_length);
-        batch_shape.push_back(output_width);
-
-        TRITONBACKEND_Response* response = responses[r];
-        GUARDED_RESPOND_IF_ERROR(
-          responses, r,
-          TRITONBACKEND_ResponseOutput(
-            response, &outputs[i], output_name, output_dtypes[i],
-            batch_shape.data(), batch_shape.size()));
-
-        if (responses[r] == nullptr) {
-            error = (std::string("request ") + std::to_string(r) +
-                    ": failed to create response output, error response sent").c_str();
-          LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
-          continue;
-        }
-
-        TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
-        int64_t output_memory_type_id = 0;
-        GUARDED_RESPOND_IF_ERROR(
-          responses, r,
-          TRITONBACKEND_OutputBuffer(
-          outputs[i], &output_buffers[i], output_byte_sizes[i], &output_memory_type,
-          &output_memory_type_id));
-
-        if ((responses[r] == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
-          GUARDED_RESPOND_IF_ERROR(
-            responses, r,
-            TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
-            "failed to create output buffer in CPU memory"));
-
-          LOG(TRITONSERVER_LOG_ERROR) << "request " << r
-            <<  ": failed to create output buffer in CPU memory, error response sent";
-          continue;
-        }
-      }
-
-      instance_state->nvt.CopyData(output_buffers, output_byte_sizes, output_names, output_dtypes);
-
-      if (responses[r] == nullptr) {
-        error = (std::string("request ") + std::to_string(r) +
-                 ": failed to get input buffer in CPU memory, error response "
-                 "sent").c_str();
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
-        continue;
-      }
+        
     }
 
     if (supports_batching && (input_dims_counts[0] > 0)) {
