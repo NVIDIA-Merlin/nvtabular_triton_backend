@@ -343,7 +343,7 @@ TRITONBACKEND_ModelInstanceExecute(
 
     const std::vector<std::string> & output_names = model_state->OutputNames();
     const std::vector<TRITONSERVER_DataType> & output_dtypes = model_state->OutputDtypes();
-    
+
     std::vector<std::unique_ptr<std::vector<wchar_t>>> numpy_input_buffers;
     std::unordered_map<std::string, size_t> max_str_sizes;
 
@@ -402,7 +402,6 @@ TRITONBACKEND_ModelInstanceExecute(
            TRITONSERVER_ERROR_INTERNAL,
            e.what());
       }
-        
     }
 
     if (supports_batching && (input_dims_counts[0] > 0)) {
