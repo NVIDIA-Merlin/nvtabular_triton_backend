@@ -211,49 +211,49 @@ class NVT_LOCAL NVTabular {
 
       if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
         py::array_t<bool> arr =
-            (py::array_t<bool>)output[output_names[i].c_str()];
+            static_cast<py::array_t<bool>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT8) {
         py::array_t<uint8_t> arr =
-            (py::array_t<uint8_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<uint8_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT16) {
         py::array_t<uint16_t> arr =
-            (py::array_t<uint16_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<uint16_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT32) {
         py::array_t<uint32_t> arr =
-            (py::array_t<uint32_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<uint32_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_UINT64) {
         py::array_t<uint64_t> arr =
-            (py::array_t<uint64_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<uint64_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT8) {
         py::array_t<int8_t> arr =
-            (py::array_t<int8_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<int8_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT16) {
         py::array_t<int16_t> arr =
-            (py::array_t<int16_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<int16_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT32) {
         py::array_t<int32_t> arr =
-            (py::array_t<int32_t>)output[output_names[i].c_str()];
+            static_cast<py::array_t<int32_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_INT64) {
-        py::array_t<uint64_t> arr =
-            (py::array_t<uint64_t>)output[output_names[i].c_str()];
+        py::array_t<int64_t> arr =
+            static_cast<py::array_t<int64_t>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP16) {
         throw std::invalid_argument("Unhandled dtype: fp16");
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP32) {
         py::array_t<float> arr =
-            (py::array_t<float>)output[output_names[i].c_str()];
+            static_cast<py::array_t<float>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else if (output_dtypes[i] == TRITONSERVER_TYPE_FP64) {
         py::array_t<double> arr =
-            (py::array_t<double>)output[output_names[i].c_str()];
+            static_cast<py::array_t<double>>(output[output_names[i].c_str()]);
         memcpy(output_buffer, arr.data(), output_byte_size);
       } else {
         throw std::invalid_argument("Unhandled dtype");
