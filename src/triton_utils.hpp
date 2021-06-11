@@ -34,16 +34,16 @@ namespace backend {
 namespace nvtabular {
 
 struct TritonException : public std::exception {
-  TRITONSERVER_Error * e;
-  explicit TritonException(TRITONSERVER_Error * e) : e(e) {}
+  TRITONSERVER_Error * error;
+  explicit TritonException(TRITONSERVER_Error * error) : error(error) {}
 
   const char * what() const noexcept override {
-    return TRITONSERVER_ErrorMessage(e);
+    return TRITONSERVER_ErrorMessage(error);
   }
 
   ~TritonException() {
-    if (e) {
-       TRITONSERVER_ErrorDelete(e);
+    if (error) {
+       TRITONSERVER_ErrorDelete(error);
     }
   }
 };

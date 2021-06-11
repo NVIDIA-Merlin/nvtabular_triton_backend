@@ -1,11 +1,11 @@
 import contextlib
-import os
 import signal
 import subprocess
 import time
 from distutils.spawn import find_executable
 
 import cudf
+import numpy as np
 import pytest
 import tritonclient
 import tritonclient.grpc as grpcclient
@@ -26,6 +26,10 @@ def run_triton_server(modelpath):
             with grpcclient.InferenceServerClient("localhost:8001") as client:
                 # wait until server is ready
                 for _ in range(60):
+                    if process.poll() is not None:
+                        retcode = process.returncode
+                        raise RuntimeError(f"Tritonserver failed to start (ret={retcode})")
+
                     try:
                         ready = client.is_server_ready()
                     except tritonclient.utils.InferenceServerException:
@@ -43,6 +47,29 @@ def run_triton_server(modelpath):
             process.send_signal(signal.SIGINT)
 
 
+def test_error_handling(tmpdir):
+    df = cudf.DataFrame({"x": np.arange(10), "y": np.arange(10)})
+
+    def custom_transform(col):
+        if len(col) == 2:
+            raise ValueError("Lets cause some problems")
+        return col
+
+    features = ["x", "y"] >> ops.FillMissing() >> ops.Normalize() >> custom_transform
+    workflow = nvt.Workflow(features)
+    workflow.fit(nvt.Dataset(df))
+
+    model_name = "test_error_handling"
+    nvt_triton.generate_nvtabular_model(workflow, model_name, tmpdir + f"/{model_name}", backend="nvtabular")
+
+    with run_triton_server(tmpdir) as client:
+        inputs = nvt_triton.convert_df_to_triton_input(["x", "y"], df[:2])
+        with pytest.raises(tritonclient.utils.InferenceServerException) as exception_info:
+            client.infer(model_name, inputs)
+
+        assert "ValueError: Lets cause some problems" in str(exception_info.value)
+
+
 def test_tritonserver_inference_string(tmpdir):
     df = cudf.DataFrame({"user": ["aaaa", "bbbb", "cccc", "aaaa", "bbbb", "aaaa"]})
     features = ["user"] >> ops.Categorify()
@@ -54,7 +81,7 @@ def test_tritonserver_inference_string(tmpdir):
 
     local_df = workflow.transform(dataset).to_ddf().compute(scheduler="synchronous")
     model_name = "test_inference_string"
-    nvt_triton.generate_nvtabular_model(workflow, model_name, tmpdir + "/test_inference_string", backend="nvtabular")
+    nvt_triton.generate_nvtabular_model(workflow, model_name, tmpdir + f"/{model_name}", backend="nvtabular")
 
     inputs = nvt_triton.convert_df_to_triton_input(["user"], df)
     with run_triton_server(tmpdir) as client:

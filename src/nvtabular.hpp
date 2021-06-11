@@ -135,7 +135,7 @@ class NVT_LOCAL NVTabular {
     nt.attr("initialize")(path_workflow.data(), dtypes_py);
   }
 
-  TRITONSERVER_Error* Transform(const std::vector<std::string>& input_names,
+  void Transform(const std::vector<std::string>& input_names,
                  const std::vector<const void*>& input_buffers,
                  const std::vector<const int64_t*>& input_shapes,
                  const std::vector<TRITONSERVER_DataType>& input_dtypes,
@@ -187,11 +187,9 @@ class NVT_LOCAL NVTabular {
         batch_shape.data(), batch_shape.size());
 
       if (response == nullptr) {
-        std::string error = (std::string("request ") + std::to_string(0) +
-                 ": failed to create response output, error response sent").c_str();
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
-        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
-          error.c_str());
+        std::stringstream err;
+        err << "request " << i << ": failed to create response output, error response sent";
+        throw std::runtime_error(err.str());
       }
 
       TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
@@ -203,10 +201,9 @@ class NVT_LOCAL NVTabular {
         &output_memory_type_id);
 
       if ((response == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
-        LOG(TRITONSERVER_LOG_ERROR) << "request " << 0
-           <<  ": failed to create output buffer in CPU memory, error response sent";
-        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
-          "failed to create output buffer in CPU memory");
+        std::stringstream err;
+        err << "request " << i << ": failed to create output buffer in CPU Memoery, error response sent";
+        throw std::runtime_error(err.str());
       }
 
       if (output_dtypes[i] == TRITONSERVER_TYPE_BOOL) {
@@ -259,8 +256,6 @@ class NVT_LOCAL NVTabular {
         throw std::invalid_argument("Unhandled dtype");
       }
     }
-
-    return nullptr;
   }
 
  private:

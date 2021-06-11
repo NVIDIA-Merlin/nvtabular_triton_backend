@@ -73,8 +73,7 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   // We should check the backend API version that Triton supports
   // vs. what this backend was compiled against.
   uint32_t api_version_major, api_version_minor;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
+  RETURN_IF_ERROR(TRITONBACKEND_ApiVersion(&api_version_major, &api_version_minor));
 
   LOG(TRITONSERVER_LOG_INFO) << "Triton TRITONBACKEND API version: " << api_version_major << "."
     << api_version_minor;
@@ -82,26 +81,14 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   LOG(TRITONSERVER_LOG_INFO) << "'" << name << "' TRITONBACKEND API version: " <<
     TRITONBACKEND_API_VERSION_MAJOR << "." << TRITONBACKEND_API_VERSION_MINOR;
 
+  /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "triton backend API version does not support this backend");
   }
-
-  // The backend configuration may contain information needed by the
-  // backend, such a command-line arguments. This backend doesn't use
-  // any such configuration but we print whatever is available.
-  TRITONSERVER_Message* backend_config_message;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_BackendConfig(backend, &backend_config_message));
-
-  const char* buffer;
-  size_t byte_size;
-  RETURN_IF_ERROR(TRITONSERVER_MessageSerializeToJson(
-      backend_config_message, &buffer, &byte_size));
-
-  LOG(TRITONSERVER_LOG_INFO) << "backend configuration:\n" << buffer;
+  */
 
   // Force opening of libpython - so that it's available globally for c-extension modules
   std::stringstream python_lib;
@@ -130,9 +117,16 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 // state and perform any other global cleanup.
 TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
-  py::gil_scoped_acquire l;
-  py::finalize_interpreter();
-  return nullptr;  // success
+  try {
+    if (Py_IsInitialized()) {
+      py::gil_scoped_acquire l;
+      py::finalize_interpreter();
+    }
+    return nullptr;
+  } catch (const std::exception & e) {
+    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
+  }
 }
 
 // Implementing TRITONBACKEND_ModelInitialize is optional. The backend
@@ -171,8 +165,7 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
   // with the TRITONBACKEND_Model.
   ModelState* model_state;
   RETURN_IF_ERROR(ModelState::Create(model, &model_state));
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelSetState(model, reinterpret_cast<void*>(model_state)));
 
   RETURN_IF_ERROR(model_state->ReadInputOutputNames());
 
@@ -184,13 +177,10 @@ TRITONBACKEND_ModelInitialize(TRITONBACKEND_Model* model) {
 // this state and perform any other cleanup.
 TRITONSERVER_Error*
 TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model) {
-  void* vstate;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vstate));
-  ModelState* model_state = reinterpret_cast<ModelState*>(vstate);
-
+  ModelState * model_state;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&model_state)));
   LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelFinalize: delete model state";
   delete model_state;
-
   return nullptr;  // success
 }
 
@@ -200,14 +190,14 @@ TRITONBACKEND_ModelFinalize(TRITONBACKEND_Model* model) {
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance) {
   const char* cname;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
-  std::string name(cname);
-
   int32_t device_id;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
   TRITONSERVER_InstanceGroupKind kind;
+
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceName(instance, &cname));
+  RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id));
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceKind(instance, &kind));
 
+  std::string name(cname);
   LOG(TRITONSERVER_LOG_INFO) << "TRITONBACKEND_ModelInstanceInitialize: " << name << " ("
        << TRITONSERVER_InstanceGroupKindString(kind) << " device " << device_id << ")";
 
@@ -216,9 +206,8 @@ TRITONBACKEND_ModelInstanceInitialize(TRITONBACKEND_ModelInstance* instance) {
   TRITONBACKEND_Model* model;
   RETURN_IF_ERROR(TRITONBACKEND_ModelInstanceModel(instance, &model));
 
-  void* vmodelstate;
-  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, &vmodelstate));
-  ModelState* model_state = reinterpret_cast<ModelState*>(vmodelstate);
+  ModelState* model_state;
+  RETURN_IF_ERROR(TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&model_state)));
 
   // With each instance we create a ModelInstanceState object and
   // associate it with the TRITONBACKEND_ModelInstance.
@@ -248,6 +237,90 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance) {
   return nullptr;  // success
 }
 
+void transform_request(ModelInstanceState * instance_state, TRITONBACKEND_Request * request,
+                       TRITONBACKEND_Response * response) {
+  const char* request_id = "";
+  check_triton(TRITONBACKEND_RequestId(request, &request_id));
+
+  uint64_t correlation_id = 0;
+  check_triton(TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
+
+  uint32_t input_count = 0, output_count = 0;
+  check_triton(TRITONBACKEND_RequestInputCount(request, &input_count));
+  check_triton(TRITONBACKEND_RequestOutputCount(request, &output_count));
+
+  LOG(TRITONSERVER_LOG_INFO) << "request_id = '"  << request_id
+      << "', correlation_id = " << correlation_id << ", input_count " << input_count
+      << ", output_count = " << output_count;
+
+  // TODO(benfred) convert to input structure
+  std::vector<TRITONBACKEND_Input*> inputs(input_count);
+  std::vector<TRITONSERVER_DataType> input_dtypes(input_count);
+  std::vector<const int64_t*> input_shapes(input_count);
+  std::vector<uint32_t> input_dims_counts(input_count);
+  std::vector<uint64_t> input_byte_sizes(input_count);
+  std::vector<uint32_t> input_buffer_counts(input_count);
+  std::vector<std::unique_ptr<std::vector<wchar_t>>> numpy_input_buffers;
+  std::unordered_map<std::string, size_t> max_str_sizes;
+  std::vector<const void*> input_buffers(input_count);
+  std::vector<uint64_t> buffer_byte_sizes(input_count);
+
+  ModelState* model_state = instance_state->StateForModel();
+  const std::vector<std::string> & input_names = model_state->InputNames();
+
+  for (uint32_t i = 0; i < input_count; i++) {
+    const char* input_name = input_names[i].c_str();
+    check_triton(TRITONBACKEND_RequestInput(request, input_name, &inputs[i]));
+    check_triton(TRITONBACKEND_InputProperties(
+      inputs[i], &input_name, &input_dtypes[i], &input_shapes[i],
+      &input_dims_counts[i], &input_byte_sizes[i], &input_buffer_counts[i]));
+
+    if (input_buffer_counts[i] != 1) {
+      std::stringstream err;
+      err << "input_buffer_count " << input_buffer_counts[i] << " not supported for input " << input_names[i];
+      throw std::invalid_argument(err.str());
+    }
+
+    input_buffers[i] = nullptr;
+
+    buffer_byte_sizes[i] = 0;
+    TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
+    int64_t input_memory_type_id = 0;
+
+    const void* input_buffer;
+
+    check_triton(TRITONBACKEND_InputBuffer(
+        inputs[i], 0, &input_buffer, &buffer_byte_sizes[i], &input_memory_type,
+        &input_memory_type_id));
+
+    if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
+      size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer),
+                                               buffer_byte_sizes[i]);
+      max_str_sizes[input_names[i]] = max_size;
+      size_t nif_size = max_size * input_shapes[i][0];
+
+      std::unique_ptr<std::vector<wchar_t>> numpy_input_buffer(new std::vector<wchar_t>(nif_size, '\0'));
+      Utils::ConstructNumpyStringArray(numpy_input_buffer->data(), static_cast<uint64_t>(max_size),
+          reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
+      input_buffers[i] = numpy_input_buffer->data();
+      numpy_input_buffers.push_back(std::move(numpy_input_buffer));
+    } else {
+      input_buffers[i] = input_buffer;
+    }
+
+    if (input_memory_type == TRITONSERVER_MEMORY_GPU) {
+      throw std::invalid_argument("Failed to get input buffer in CPU memory");
+    }
+  }
+
+  const std::vector<std::string> & output_names = model_state->OutputNames();
+  const std::vector<TRITONSERVER_DataType> & output_dtypes = model_state->OutputDtypes();
+
+  py::gil_scoped_acquire l;
+  instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
+          input_dtypes, max_str_sizes, output_names, output_dtypes, response);
+}
+
 // Implementing TRITONBACKEND_ModelInstanceExecute is required.
 TRITONSERVER_Error*
 TRITONBACKEND_ModelInstanceExecute(
@@ -265,16 +338,6 @@ TRITONBACKEND_ModelInstanceExecute(
   bool supports_batching = false;
   RETURN_IF_ERROR(model_state->SupportsFirstDimBatching(&supports_batching));
 
-  std::vector<TRITONBACKEND_Response*> responses;
-  responses.reserve(request_count);
-  for (uint32_t r = 0; r < request_count; ++r) {
-    TRITONBACKEND_Request* request = requests[r];
-
-    TRITONBACKEND_Response* response;
-    RETURN_IF_ERROR(TRITONBACKEND_ResponseNew(&response, request));
-    responses.push_back(response);
-  }
-
   uint64_t min_exec_start_ns = std::numeric_limits<uint64_t>::max();
   uint64_t max_exec_end_ns = 0;
   uint64_t total_batch_size = 0;
@@ -285,134 +348,35 @@ TRITONBACKEND_ModelInstanceExecute(
     SET_TIMESTAMP(exec_start_ns);
     min_exec_start_ns = std::min(min_exec_start_ns, exec_start_ns);
 
-    TRITONBACKEND_Request* request = requests[r];
+    auto request = requests[r];
+    TRITONBACKEND_Response* response = NULL;
+    auto err = TRITONBACKEND_ResponseNew(&response, request);
+    LOG_IF_ERROR(err, "Failed to create response object");
+    if (err) continue;
 
-    const char* request_id = "";
-    GUARDED_RESPOND_IF_ERROR(
-      responses, r, TRITONBACKEND_RequestId(request, &request_id));
-
-    uint64_t correlation_id = 0;
-    GUARDED_RESPOND_IF_ERROR(
-      responses, r,
-      TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
-
-    uint32_t input_count = 0;
-    GUARDED_RESPOND_IF_ERROR(
-      responses, r, TRITONBACKEND_RequestInputCount(request, &input_count));
-
-    uint32_t requested_output_count = 0;
-    GUARDED_RESPOND_IF_ERROR(
-      responses, r,
-      TRITONBACKEND_RequestOutputCount(request, &requested_output_count));
-
-    if (responses[r] == nullptr) {
-      LOG(TRITONSERVER_LOG_ERROR) << "request " << r
-        << ": failed to read request input/output counts, error response sent";
-      continue;
+    try {
+      transform_request(instance_state, request, response);
+    } catch (const TritonException & e) {
+      LOG_IF_ERROR(TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, e.error),
+                  "Failed to send error response");
+    } catch (const std::exception & e) {
+      auto err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
+      LOG_IF_ERROR(TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+                  "Failed to send error response");
+      TRITONSERVER_ErrorDelete(err);
     }
 
-    LOG(TRITONSERVER_LOG_INFO) << "request " << r << ": id = '"  << request_id
-      << "', correlation_id = " << correlation_id << ", input_count " << input_count
-      << ", requested_output_count = " << requested_output_count;
-    const std::vector<std::string> & input_names = model_state->InputNames();
-
-    std::vector<TRITONBACKEND_Input*> inputs(input_count);
-    std::vector<TRITONSERVER_DataType> input_dtypes(input_count);
-    std::vector<const int64_t*> input_shapes(input_count);
-    std::vector<uint32_t> input_dims_counts(input_count);
-    std::vector<uint64_t> input_byte_sizes(input_count);
-    std::vector<uint32_t> input_buffer_counts(input_count);
-
-    for (uint32_t i = 0; i < input_count; i++) {
-      const char* input_name = input_names[i].c_str();
-      GUARDED_RESPOND_IF_ERROR(
-        responses, r, TRITONBACKEND_RequestInput(request, input_name, &inputs[i]));
-
-      GUARDED_RESPOND_IF_ERROR(
-        responses, r,
-        TRITONBACKEND_InputProperties(
-          inputs[i], &input_name, &input_dtypes[i], &input_shapes[i],
-          &input_dims_counts[i], &input_byte_sizes[i], &input_buffer_counts[i]));
-
-      if (responses[r] == nullptr) {
-        LOG(TRITONSERVER_LOG_ERROR) << "request " << r
-          << " : failed to read input properties, error response sent";
-        continue;
-      }
-    }
-
-    const std::vector<std::string> & output_names = model_state->OutputNames();
-    const std::vector<TRITONSERVER_DataType> & output_dtypes = model_state->OutputDtypes();
-
-    std::vector<std::unique_ptr<std::vector<wchar_t>>> numpy_input_buffers;
-    std::unordered_map<std::string, size_t> max_str_sizes;
-
-    for (uint32_t b = 0; b < input_buffer_counts[0]; ++b) {
-      std::vector<const void*> input_buffers(input_count);
-      std::vector<uint64_t> buffer_byte_sizes(input_count);
-
-      for (uint32_t i = 0; i < input_count; ++i) {
-        input_buffers[i] = nullptr;
-
-        buffer_byte_sizes[i] = 0;
-        TRITONSERVER_MemoryType input_memory_type = TRITONSERVER_MEMORY_CPU;
-        int64_t input_memory_type_id = 0;
-
-        const void* input_buffer;
-
-        GUARDED_RESPOND_IF_ERROR(
-          responses, r,
-          TRITONBACKEND_InputBuffer(
-            inputs[i], b, &input_buffer, &buffer_byte_sizes[i], &input_memory_type,
-            &input_memory_type_id));
-
-        if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
-          size_t max_size = Utils::GetMaxStringLen(reinterpret_cast<const unsigned char*>(input_buffer),
-                                                   buffer_byte_sizes[i]);
-          max_str_sizes[input_names[i]] = max_size;
-          size_t nif_size = max_size * input_shapes[i][0];
-
-          std::unique_ptr<std::vector<wchar_t>> numpy_input_buffer(new std::vector<wchar_t>(nif_size, '\0'));
-          Utils::ConstructNumpyStringArray(numpy_input_buffer->data(), static_cast<uint64_t>(max_size),
-              reinterpret_cast<const unsigned char*>(input_buffer), buffer_byte_sizes[i]);
-          input_buffers[i] = numpy_input_buffer->data();
-          numpy_input_buffers.push_back(std::move(numpy_input_buffer));
-        } else {
-          input_buffers[i] = input_buffer;
-        }
-
-        if ((responses[r] == nullptr) || (input_memory_type == TRITONSERVER_MEMORY_GPU)) {
-          GUARDED_RESPOND_IF_ERROR(
-              responses, r,
-              TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_UNSUPPORTED,
-                "failed to get input buffer in CPU memory"));
-        }
-      }
-
-      py::gil_scoped_acquire l;
-      try {
-        TRITONSERVER_Error* err_trans = instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
-          input_dtypes, max_str_sizes, output_names, output_dtypes, responses[r]);
-        if (err_trans != nullptr)
-          return err_trans;
-      } catch (const py::error_already_set &e) {
-        LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
-        return TRITONSERVER_ErrorNew(
-           TRITONSERVER_ERROR_INTERNAL,
-           e.what());
-      }
-    }
-
+    /* TODO:
     if (supports_batching && (input_dims_counts[0] > 0)) {
       total_batch_size += input_shapes[0][0];
     } else {
       total_batch_size++;
     }
+    */
 
     LOG_IF_ERROR(
       TRITONBACKEND_ResponseSend(
-        responses[r], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+        response, TRITONSERVER_RESPONSE_COMPLETE_FINAL,
         nullptr /* success */),
         "failed sending response");
 
@@ -425,30 +389,18 @@ TRITONBACKEND_ModelInstanceExecute(
         instance_state->TritonModelInstance(), request, true /* success */,
         exec_start_ns, exec_start_ns, exec_end_ns, exec_end_ns),
         "failed reporting request statistics");
-  }
 
-  LOG_IF_ERROR(
-    TRITONBACKEND_ModelInstanceReportBatchStatistics(
-      instance_state->TritonModelInstance(), total_batch_size,
-      min_exec_start_ns, min_exec_start_ns, max_exec_end_ns,
-      max_exec_end_ns),
-      "failed reporting batch request statistics");
-
-  for (uint32_t r = 0; r < request_count; ++r) {
-    TRITONBACKEND_Request* request = requests[r];
-    if (responses[r] == nullptr) {
-      LOG_IF_ERROR(
-        TRITONBACKEND_ModelInstanceReportStatistics(
-           instance_state->TritonModelInstance(), request,
-           false /* success */, 0, 0, 0, 0),
-           "failed reporting request statistics");
-    }
+    LOG_IF_ERROR(
+      TRITONBACKEND_ModelInstanceReportBatchStatistics(
+        instance_state->TritonModelInstance(), total_batch_size,
+        min_exec_start_ns, min_exec_start_ns, max_exec_end_ns,
+        max_exec_end_ns),
+        "failed reporting batch request statistics");
 
     LOG_IF_ERROR(
       TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
         "failed releasing request");
   }
-
   return nullptr;  // success
 }
 
