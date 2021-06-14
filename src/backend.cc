@@ -81,14 +81,12 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
   LOG(TRITONSERVER_LOG_INFO) << "'" << name << "' TRITONBACKEND API version: " <<
     TRITONBACKEND_API_VERSION_MAJOR << "." << TRITONBACKEND_API_VERSION_MINOR;
 
-  /*
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED,
         "triton backend API version does not support this backend");
   }
-  */
 
   // Force opening of libpython - so that it's available globally for c-extension modules
   std::stringstream python_lib;
