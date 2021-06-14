@@ -202,7 +202,7 @@ class NVT_LOCAL NVTabular {
 
       if ((response == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
         std::stringstream err;
-        err << "request " << i << ": failed to create output buffer in CPU Memoery, error response sent";
+        err << "request " << i << ": failed to create output buffer in CPU Memory, error response sent";
         throw std::runtime_error(err.str());
       }
 
