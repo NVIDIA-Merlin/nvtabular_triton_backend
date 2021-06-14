@@ -46,77 +46,8 @@ namespace py = pybind11;
 namespace triton {
 namespace backend {
 namespace nvtabular {
-
+    
 class NVT_LOCAL NVTabular {
- private:
-  void fill_array_interface(py::dict & ai, const size_t max_size) {  // NOLINT
-    py::list list_desc;
-    std::string u("<U");
-    u.append(std::to_string(max_size));
-    ai["typestr"] = u.c_str();
-    std::tuple<std::string, std::string> desc("", u.c_str());
-    list_desc.append(desc);
-    ai["descr"] = list_desc;
-    ai["version"] = 3;
-  }
-
-  void fill_array_interface(py::dict & ai, TRITONSERVER_DataType dtype) {  // NOLINT
-    py::list list_desc;
-    if (dtype == TRITONSERVER_TYPE_BOOL) {
-      ai["typestr"] = "|b1";
-      std::tuple<std::string, std::string> desc("", "|b1");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_INT8) {
-      ai["typestr"] = "<i1";
-      std::tuple<std::string, std::string> desc("", "<i1");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_INT16) {
-      ai["typestr"] = "<i2";
-      std::tuple<std::string, std::string> desc("", "<i2");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_INT32) {
-      ai["typestr"] = "<i4";
-      std::tuple<std::string, std::string> desc("", "<i4");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_INT64) {
-      ai["typestr"] = "<i8";
-      std::tuple<std::string, std::string> desc("", "<i8");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_UINT8) {
-      ai["typestr"] = "<i1";
-      std::tuple<std::string, std::string> desc("", "<u1");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_UINT16) {
-      ai["typestr"] = "<i2";
-      std::tuple<std::string, std::string> desc("", "<u2");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_UINT32) {
-      ai["typestr"] = "<i4";
-      std::tuple<std::string, std::string> desc("", "<u4");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_UINT64) {
-      ai["typestr"] = "<i8";
-      std::tuple<std::string, std::string> desc("", "<u8");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_FP16) {
-      ai["typestr"] = "<f2";
-      std::tuple<std::string, std::string> desc("", "<f2");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_FP32) {
-      ai["typestr"] = "<f4";
-      std::tuple<std::string, std::string> desc("", "<f4");
-      list_desc.append(desc);
-    } else if (dtype == TRITONSERVER_TYPE_FP64) {
-      ai["typestr"] = "<f8";
-      std::tuple<std::string, std::string> desc("", "<f8");
-      list_desc.append(desc);
-    }
-    ai["descr"] = list_desc;
-    ai["version"] = 3;
-  }
-
-  std::map<std::string, std::string> dtypes;
-
  public:
   void Deserialize(const std::string &path_workflow,
                    const std::map<std::string, std::string> & dtypes) {
@@ -133,6 +64,8 @@ class NVT_LOCAL NVTabular {
 
     nt = nvtabular();
     nt.attr("initialize")(path_workflow.data(), dtypes_py);
+      
+    store_column_types();
   }
 
   TRITONSERVER_Error* Transform(const std::vector<std::string>& input_names,
@@ -163,6 +96,44 @@ class NVT_LOCAL NVTabular {
     py::list all_output_names;
     for (uint32_t i = 0; i < output_names.size(); ++i) {
       all_output_names.append(output_names[i]);
+      if (column_types[output_names[i]]) {
+        int64_t output_length = input_shapes[0][0];
+        int64_t output_width = 1;
+        int64_t output_byte_size = output_length * output_width *
+            Utils::GetTritonTypeByteSize(output_dtypes[i]);
+
+        std::vector<int64_t> batch_shape;
+        batch_shape.push_back(output_length);
+        batch_shape.push_back(output_width);
+
+        TRITONBACKEND_Output* output_tri;
+        TRITONBACKEND_ResponseOutput(
+          response, &output_tri, output_names[i].c_str(), output_dtypes[i],
+          batch_shape.data(), batch_shape.size());
+          
+        if (response == nullptr) {
+          std::string error = (std::string("request ") + std::to_string(0) +
+            ": failed to create response output, error response sent").c_str();
+          LOG_MESSAGE(TRITONSERVER_LOG_ERROR, error.c_str());
+          return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
+            error.c_str());
+        }
+
+        TRITONSERVER_MemoryType output_memory_type = TRITONSERVER_MEMORY_CPU;
+        int64_t output_memory_type_id = 0;
+          
+        void* output_buffer;
+        TRITONBACKEND_OutputBuffer(
+          output_tri, &output_buffer, output_byte_size, &output_memory_type,
+          &output_memory_type_id);
+
+        if ((response == nullptr) || (output_memory_type == TRITONSERVER_MEMORY_GPU)) {
+          LOG(TRITONSERVER_LOG_ERROR) << "request " << 0
+             <<  ": failed to create output buffer in CPU memory, error response sent";
+          return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED,
+            "failed to create output buffer in CPU memory");
+        }
+      }
     }
 
     py::tuple trans_data_info =
@@ -263,7 +234,90 @@ class NVT_LOCAL NVTabular {
     return nullptr;
   }
 
+  std::unordered_map<std::string, bool> GetColumnTypes() {
+    return column_types;
+  }
+
  private:
+  void fill_array_interface(py::dict & ai, const size_t max_size) {  // NOLINT
+    py::list list_desc;
+    std::string u("<U");
+    u.append(std::to_string(max_size));
+    ai["typestr"] = u.c_str();
+    std::tuple<std::string, std::string> desc("", u.c_str());
+    list_desc.append(desc);
+    ai["descr"] = list_desc;
+    ai["version"] = 3;
+  }
+
+  void fill_array_interface(py::dict & ai, TRITONSERVER_DataType dtype) {  // NOLINT
+    py::list list_desc;
+    if (dtype == TRITONSERVER_TYPE_BOOL) {
+      ai["typestr"] = "|b1";
+      std::tuple<std::string, std::string> desc("", "|b1");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_INT8) {
+      ai["typestr"] = "<i1";
+      std::tuple<std::string, std::string> desc("", "<i1");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_INT16) {
+      ai["typestr"] = "<i2";
+      std::tuple<std::string, std::string> desc("", "<i2");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_INT32) {
+      ai["typestr"] = "<i4";
+      std::tuple<std::string, std::string> desc("", "<i4");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_INT64) {
+      ai["typestr"] = "<i8";
+      std::tuple<std::string, std::string> desc("", "<i8");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_UINT8) {
+      ai["typestr"] = "<i1";
+      std::tuple<std::string, std::string> desc("", "<u1");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_UINT16) {
+      ai["typestr"] = "<i2";
+      std::tuple<std::string, std::string> desc("", "<u2");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_UINT32) {
+      ai["typestr"] = "<i4";
+      std::tuple<std::string, std::string> desc("", "<u4");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_UINT64) {
+      ai["typestr"] = "<i8";
+      std::tuple<std::string, std::string> desc("", "<u8");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_FP16) {
+      ai["typestr"] = "<f2";
+      std::tuple<std::string, std::string> desc("", "<f2");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_FP32) {
+      ai["typestr"] = "<f4";
+      std::tuple<std::string, std::string> desc("", "<f4");
+      list_desc.append(desc);
+    } else if (dtype == TRITONSERVER_TYPE_FP64) {
+      ai["typestr"] = "<f8";
+      std::tuple<std::string, std::string> desc("", "<f8");
+      list_desc.append(desc);
+    }
+    ai["descr"] = list_desc;
+    ai["version"] = 3;
+  }
+    
+  void store_column_types() {
+    py::dict col_types = nt.attr("get_column_types")();      
+    for (auto item : col_types) {
+      if (std::string(py::str(item.second)).compare("ColumnType.SINGLEHOT") == 0) {
+        column_types[std::string(py::str(item.first))] = true;
+      } else {
+        column_types[std::string(py::str(item.first))] = false;
+      }
+    }
+  }
+
+  std::unordered_map<std::string, bool> column_types;
+  std::map<std::string, std::string> dtypes;
   py::object nt;
 };
 
