@@ -235,8 +235,8 @@ TRITONBACKEND_ModelInstanceFinalize(TRITONBACKEND_ModelInstance* instance) {
   return nullptr;  // success
 }
 
-void transform_request(ModelInstanceState * instance_state, TRITONBACKEND_Request * request,
-                       TRITONBACKEND_Response * response) {
+int64_t transform_request(ModelInstanceState * instance_state, TRITONBACKEND_Request * request,
+                          TRITONBACKEND_Response * response) {
   const char* request_id = "";
   check_triton(TRITONBACKEND_RequestId(request, &request_id));
 
@@ -317,6 +317,8 @@ void transform_request(ModelInstanceState * instance_state, TRITONBACKEND_Reques
   py::gil_scoped_acquire l;
   instance_state->nvt.Transform(input_names, input_buffers, input_shapes,
           input_dtypes, max_str_sizes, output_names, output_dtypes, response);
+
+  return input_dims_counts[0] ? input_shapes[0][0] : 1;
 }
 
 // Implementing TRITONBACKEND_ModelInstanceExecute is required.
@@ -353,7 +355,8 @@ TRITONBACKEND_ModelInstanceExecute(
     if (err) continue;
 
     try {
-      transform_request(instance_state, request, response);
+      auto request_size = transform_request(instance_state, request, response);
+      total_batch_size += supports_batching ? request_size : 1;
     } catch (const TritonException & e) {
       LOG_IF_ERROR(TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, e.error),
                   "Failed to send error response");
@@ -363,14 +366,6 @@ TRITONBACKEND_ModelInstanceExecute(
                   "Failed to send error response");
       TRITONSERVER_ErrorDelete(err);
     }
-
-    /* TODO:
-    if (supports_batching && (input_dims_counts[0] > 0)) {
-      total_batch_size += input_shapes[0][0];
-    } else {
-      total_batch_size++;
-    }
-    */
 
     LOG_IF_ERROR(
       TRITONBACKEND_ResponseSend(
