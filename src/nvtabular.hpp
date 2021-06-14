@@ -50,7 +50,7 @@ namespace nvtabular {
 class NVT_LOCAL NVTabular {
  public:
   void Deserialize(const std::string &path_workflow,
-                   const std::map<std::string, std::string> & dtypes) {
+                   const std::map<std::string, std::string> &dtypes) {
     this->dtypes = dtypes;
 
     py::dict dtypes_py;
@@ -82,7 +82,7 @@ class NVT_LOCAL NVTabular {
       py::dict ai_in;
       std::tuple<int64_t> shape_in(static_cast<int64_t>(input_shapes[i][0]));
       ai_in["shape"] = shape_in;
-      std::tuple<int64_t, bool> data_in((int64_t)*(&input_buffers[i]), false);
+      std::tuple<int64_t, bool> data_in((int64_t) * (&input_buffers[i]), false);
       ai_in["data"] = data_in;
       if (input_dtypes[i] == TRITONSERVER_TYPE_BYTES) {
         fill_array_interface(ai_in, max_str_sizes.at(input_names[i]));
@@ -230,7 +230,6 @@ class NVT_LOCAL NVTabular {
         throw std::invalid_argument("Unhandled dtype");
       }
     }
-
     return nullptr;
   }
 
@@ -321,7 +320,7 @@ class NVT_LOCAL NVTabular {
   py::object nt;
 };
 
-}  // namespace nvtabular
-}  // namespace backend
-}  // namespace triton
-#endif  // NVTABULAR_HPP_
+} // namespace nvtabular
+} // namespace backend
+} // namespace triton
+#endif // NVTABULAR_HPP_

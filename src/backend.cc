@@ -35,6 +35,8 @@
 #include <chrono>
 #include <iostream>
 #include <fstream>
+#include <cuda_runtime_api.h>
+#include <cuda.h>
 
 #include "triton/backend/backend_common.h"
 #include "nvtabular.hpp"

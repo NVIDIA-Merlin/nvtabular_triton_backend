@@ -39,7 +39,7 @@ find_package(pybind11 REQUIRED)
 # GPU support is disabled by default because nvtabular backend doesn't
 # support GPUs.
 #
-option(TRITON_ENABLE_GPU "Enable GPU support in backend" OFF)
+option(TRITON_ENABLE_GPU "Enable GPU support in backend" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in backend" ON)
 
 set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
@@ -79,6 +79,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
+
+find_package(CUDAToolkit REQUIRED)
+find_package(CUDA REQUIRED)
+message(STATUS "Using CUDA ${CUDA_VERSION}")
+set(CUDA_NVCC_FLAGS -std=c++11)
+
+if(CUDA_VERSION VERSION_GREATER "10.1" OR CUDA_VERSION VERSION_EQUAL "10.1")
+  add_definitions(-DTRITON_ENABLE_CUDA_GRAPH=1)
+else()
+  message(WARNING "CUDA ${CUDA_VERSION} does not support CUDA graphs.")
+endif()
+
+
 #
 # Shared library implementing the Triton Backend API
 #
@@ -93,8 +106,10 @@ add_library(
   TritonNVTabularBackend::triton-nvtabular-backend ALIAS triton-nvtabular-backend
 )
 
+
 target_include_directories(
   triton-nvtabular-backend
+  ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     
