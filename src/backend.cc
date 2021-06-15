@@ -360,11 +360,13 @@ TRITONBACKEND_ModelInstanceExecute(
     } catch (const TritonException & e) {
       LOG_IF_ERROR(TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, e.error),
                   "Failed to send error response");
+      continue;
     } catch (const std::exception & e) {
       auto err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
       LOG_IF_ERROR(TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
                   "Failed to send error response");
       TRITONSERVER_ErrorDelete(err);
+      continue;
     }
 
     LOG_IF_ERROR(
