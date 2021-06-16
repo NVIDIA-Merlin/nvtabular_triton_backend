@@ -36,22 +36,6 @@
 // https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-visibility-than-the-type-of-its-field-someclass-member-wattributes
 #define NVT_LOCAL __attribute__ ((visibility ("hidden")))
 
-#define GUARDED_RESPOND_IF_ERROR(RESPONSES, IDX, X)                     \
-  do {                                                                  \
-    if ((RESPONSES)[IDX] != nullptr) {                                  \
-      TRITONSERVER_Error* err__ = (X);                                  \
-      if (err__ != nullptr) {                                           \
-        LOG_IF_ERROR(                                                   \
-            TRITONBACKEND_ResponseSend(                                 \
-                (RESPONSES)[IDX], TRITONSERVER_RESPONSE_COMPLETE_FINAL, \
-                err__),                                                 \
-            "failed to send error response");                           \
-        (RESPONSES)[IDX] = nullptr;                                     \
-        TRITONSERVER_ErrorDelete(err__);                                \
-      }                                                                 \
-    }                                                                   \
-  } while (false)
-
 namespace triton {
 namespace backend {
 namespace nvtabular {
