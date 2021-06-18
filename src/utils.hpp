@@ -137,16 +137,15 @@ class Utils {
 
   static size_t GetMaxStringLen(const unsigned char *str, const uint64_t len) {
     size_t max_len = 0;
-    size_t pad_size = 4;
     uint64_t i = 0;
 
     while (i < len) {
-      size_t curr = static_cast<size_t>(str[i]);
+      uint32_t curr = *reinterpret_cast<const uint32_t *>(str + i);
       if (curr > max_len) {
         max_len = curr;
       }
 
-      i += pad_size + curr;
+      i += sizeof(curr) + curr;
       if (i > len) {
         max_len = -1;
       }
@@ -157,16 +156,15 @@ class Utils {
   static void ConstructNumpyStringArray(wchar_t *dest, const uint64_t elem_len,
                                         const unsigned char *source,
                                         const uint64_t len) {
-    size_t pad_size = 4;
     uint64_t i = 0;
     uint64_t j = 0;
 
     while (i < len) {
-      size_t curr = static_cast<size_t>(source[i]);
-      for (size_t k = 0; k < curr; ++k) {
-        dest[j + k] = static_cast<wchar_t>(source[i + pad_size + k]);
+      uint32_t curr = *reinterpret_cast<const uint32_t *>(source + i);
+      for (uint32_t k = 0; k < curr; ++k) {
+        dest[j + k] = static_cast<wchar_t>(source[i + sizeof(curr) + k]);
       }
-      i += pad_size + curr;
+      i += sizeof(curr) + curr;
       j += elem_len;
     }
   }
