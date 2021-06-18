@@ -47,6 +47,26 @@ def run_triton_server(modelpath):
             process.send_signal(signal.SIGINT)
 
 
+def _verify_workflow_on_tritonserver(tmpdir, workflow, df, model_name):
+    """tests that the nvtabular workflow produces the same results when run locally in the
+    process, and when run in tritonserver"""
+    # fit the workflow and test on the input
+    dataset = nvt.Dataset(df)
+    workflow.fit(dataset)
+
+    local_df = workflow.transform(dataset).to_ddf().compute(scheduler="synchronous")
+    nvt_triton.generate_nvtabular_model(workflow, model_name, tmpdir + f"/{model_name}", backend="nvtabular")
+
+    inputs = nvt_triton.convert_df_to_triton_input(df.columns, df)
+    with run_triton_server(tmpdir) as client:
+        response = client.infer(model_name, inputs)
+
+        for col in df.columns:
+            features = response.as_numpy(col)
+            triton_df = cudf.DataFrame({col: features.reshape(features.shape[0])})
+            assert_eq(triton_df, local_df[[col]])
+
+
 def test_error_handling(tmpdir):
     df = cudf.DataFrame({"x": np.arange(10), "y": np.arange(10)})
 
@@ -74,18 +94,12 @@ def test_tritonserver_inference_string(tmpdir):
     df = cudf.DataFrame({"user": ["aaaa", "bbbb", "cccc", "aaaa", "bbbb", "aaaa"]})
     features = ["user"] >> ops.Categorify()
     workflow = nvt.Workflow(features)
+    _verify_workflow_on_tritonserver(tmpdir, workflow, df, "test_inference_string")
 
-    # fit the workflow and test on the input
-    dataset = nvt.Dataset(df)
-    workflow.fit(dataset)
 
-    local_df = workflow.transform(dataset).to_ddf().compute(scheduler="synchronous")
-    model_name = "test_inference_string"
-    nvt_triton.generate_nvtabular_model(workflow, model_name, tmpdir + f"/{model_name}", backend="nvtabular")
-
-    inputs = nvt_triton.convert_df_to_triton_input(["user"], df)
-    with run_triton_server(tmpdir) as client:
-        response = client.infer(model_name, inputs)
-        user_features = response.as_numpy("user")
-        triton_df = cudf.DataFrame({"user": user_features.reshape(user_features.shape[0])})
-        assert_eq(triton_df, local_df)
+def test_large_strings(tmpdir):
+    strings = ["a" * (2 ** exp) for exp in range(1, 17)]
+    df = cudf.DataFrame({"description": strings})
+    features = ["description"] >> ops.Categorify()
+    workflow = nvt.Workflow(features)
+    _verify_workflow_on_tritonserver(tmpdir, workflow, df, "test_large_string")
