@@ -95,7 +95,7 @@ class NVT_LOCAL ModelInstanceState {
 
       // copy the outputs out from python back the the TRITONBACKED_Response object
       for (uint32_t i = 0; i < request_count; ++i) {
-        auto response = py::cast<InferenceResponse&>(responses[i]);
+        auto & response = py::cast<InferenceResponse&>(responses[i]);
         if (response.error.is_none()) {
           response.copy_to_triton(triton_responses[i]);
         } else {

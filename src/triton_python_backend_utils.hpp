@@ -106,6 +106,11 @@ struct NVT_LOCAL InferenceResponse {
 
   py::object error;
   std::vector<Tensor> outputs;
+
+  InferenceResponse(InferenceResponse &&) = default;
+  InferenceResponse& operator=(InferenceResponse && other) = default;
+  InferenceResponse(const InferenceResponse &) = delete;
+  InferenceResponse& operator=(const InferenceResponse &) = delete;
 };
 
 // Export our c++ classes to python as a 'triton_python_backend_utils' builtin module
