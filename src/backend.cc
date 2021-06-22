@@ -95,15 +95,15 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 
     // we need to import our embedded extension module here
     py::module_::import("triton_python_backend_utils");
-
-    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
-
-    // we have to manually release the GIL here otherwise we'll deadlock in future threads
-    PyEval_SaveThread();
   } catch (const std::exception & e) {
     LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
   }
+  // we have to manually release the GIL here otherwise we'll deadlock in future threads
+  // but lets save the threadstate for shutdown
+  auto thread_state = PyEval_SaveThread();
+  check_triton(TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(thread_state)));
+  LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
   return nullptr;  // success
 }
 
@@ -112,7 +112,12 @@ TRITONSERVER_Error*
 TRITONBACKEND_Finalize(TRITONBACKEND_Backend* backend) {
   try {
     if (Py_IsInitialized()) {
-      py::gil_scoped_acquire l;
+      // acquire the GIL from the saved python thread state. Note that we're not using the
+      // pybind gil_scoped_acquire object here, because releasing the GIL once it goes out of
+      // scope can cause issues once the interpreter has been shutdown
+      PyThreadState * thread_state;
+      check_triton(TRITONBACKEND_BackendState(backend, reinterpret_cast<void**>(&thread_state)));
+      PyEval_RestoreThread(thread_state);
       py::finalize_interpreter();
     }
     return nullptr;
