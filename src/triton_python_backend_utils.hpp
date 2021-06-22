@@ -86,26 +86,25 @@ class NVT_LOCAL Tensor {
 
   std::string name;
   py::array numpy_array;
+  Tensor(Tensor &&) = default;
+  Tensor& operator=(Tensor && other) = default;
+  Tensor(const Tensor &) = delete;
+  Tensor& operator=(const Tensor &) = delete;
 };
 
 // Container for all the Tensor objects in a response, and mimics the  'InferenceResponse' object in the python_backend
 // https://github.com/triton-inference-server/python_backend/blob/fd0f6ba090ce5c9ed8938da08bceb1d407e5b33a/src/resources/triton_python_backend_utils.py#L186 NOLINT
 struct NVT_LOCAL InferenceResponse {
-  InferenceResponse(py::list tensors, py::object error) : error(error) {
-    for (size_t i = 0; i < py::len(tensors); ++i) {
-      py::object tensor = tensors[i];
-      outputs.push_back(py::cast<Tensor>(tensor));
-    }
-  }
+  InferenceResponse(py::list tensors, py::object error) : tensors(tensors), error(error) { }
 
   void copy_to_triton(TRITONBACKEND_Response * response) {
-    for (auto & output : outputs) {
-      output.copy_to_triton(response);
+    for (auto & output : tensors) {
+      py::cast<Tensor &>(output).copy_to_triton(response);
     }
   }
 
+  py::list tensors;
   py::object error;
-  std::vector<Tensor> outputs;
 
   InferenceResponse(InferenceResponse &&) = default;
   InferenceResponse& operator=(InferenceResponse && other) = default;
