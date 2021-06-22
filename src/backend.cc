@@ -95,15 +95,16 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 
     // we need to import our embedded extension module here
     py::module_::import("triton_python_backend_utils");
+
+    // we have to manually release the GIL here otherwise we'll deadlock in future threads
+    // but lets save the threadstate for shutdown
+    auto thread_state = PyEval_SaveThread();
+    check_triton(TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(thread_state)));
+    LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
   } catch (const std::exception & e) {
     LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
   }
-  // we have to manually release the GIL here otherwise we'll deadlock in future threads
-  // but lets save the threadstate for shutdown
-  auto thread_state = PyEval_SaveThread();
-  check_triton(TRITONBACKEND_BackendSetState(backend, reinterpret_cast<void*>(thread_state)));
-  LOG_MESSAGE(TRITONSERVER_LOG_INFO, "Python interpreter is initialized");
   return nullptr;  // success
 }
 
