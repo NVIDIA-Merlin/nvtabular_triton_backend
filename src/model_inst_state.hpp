@@ -27,112 +27,124 @@
 #ifndef MODEL_INST_STATE_HPP_
 #define MODEL_INST_STATE_HPP_
 
+#include <pybind11/embed.h>
 
 #include <map>
 #include <string>
 #include <vector>
 
-#include "utils.hpp"
+#include "triton_utils.hpp"
+#include "triton_python_backend_utils.hpp"
 
 
 namespace triton {
 namespace backend {
 namespace nvtabular {
 
-//
-// ModelInstanceState
-//
-// State associated with a model instance. An object of this class is
-// created and associated with each TRITONBACKEND_ModelInstance.
-//
+namespace py = pybind11;
+
+
 class NVT_LOCAL ModelInstanceState {
  public:
-  static TRITONSERVER_Error *
-  Create(ModelState *model_state,
-         TRITONBACKEND_ModelInstance *triton_model_instance,
-         ModelInstanceState **state);
+  explicit ModelInstanceState(TRITONBACKEND_ModelInstance * instance)
+    : instance_(instance) {
+    const char *instance_name;
+    check_triton(TRITONBACKEND_ModelInstanceName(instance, &instance_name));
+    check_triton(TRITONBACKEND_ModelInstanceKind(instance, &kind_));
+    check_triton(TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id_));
+    name_ = instance_name;
 
-  // Get the handle to the TRITONBACKEND model instance.
-  TRITONBACKEND_ModelInstance *TritonModelInstance() {
-    return triton_model_instance_;
+    TRITONBACKEND_Model* model;
+    check_triton(TRITONBACKEND_ModelInstanceModel(instance, &model));
+    check_triton(TRITONBACKEND_ModelState(model, reinterpret_cast<void**>(&model_state_)));
+
+    // Create the TritonPythonModel and initialize it from the model state
+    py::gil_scoped_acquire l;
+    py::object module = py::module_::import("nvtabular.inference.triton.model");
+    python_model = module.attr("TritonPythonModel")();
+
+    py::dict args;
+    args["model_config"] = model_state_->ModelConfig();
+    args["model_version"] = model_state_->Version();
+    args["model_repository"] = model_state_->Path();
+    python_model.attr("initialize")(args);
   }
 
-  // Get the name, kind and device ID of the instance.
-  const std::string &Name() const { return name_; }
-  TRITONSERVER_InstanceGroupKind Kind() const { return kind_; }
-  int32_t DeviceId() const { return device_id_; }
+  void transform_requests(TRITONBACKEND_Request ** triton_requests,
+                          TRITONBACKEND_Response ** triton_responses,
+                          uint32_t request_count) {
+    uint64_t exec_start = timestamp_ns();
 
-  // Get the state of the model that corresponds to this instance.
-  ModelState *StateForModel() const { return model_state_; }
+    std::vector<InferenceRequest> requests;
+    for (uint32_t i = 0; i < request_count; ++i) {
+      requests.push_back(InferenceRequest(triton_requests[i]));
+    }
 
-  bool inter_started = false;
-  NVTabular nvt;
+    std::vector<TRITONSERVER_Error *> errors(request_count, nullptr);
+
+    uint64_t compute_start = timestamp_ns(), compute_end = 0;
+    {
+      // Transform the request using the python model. We need the GIL here, so this is scoped as tightly
+      // as possible with the GIL to reduce contention.
+      py::gil_scoped_acquire l;
+      py::list responses = python_model.attr("execute")(py::cast(&requests, py::return_value_policy::reference));
+      if (py::len(responses) != request_count) {
+        throw std::invalid_argument("number of responses doesn't match number of requests");
+      }
+      compute_end = timestamp_ns();
+
+      // copy the outputs out from python back the the TRITONBACKED_Response object
+      for (uint32_t i = 0; i < request_count; ++i) {
+        auto response = py::cast<InferenceResponse&>(responses[i]);
+        if (response.error.is_none()) {
+          response.copy_to_triton(triton_responses[i]);
+        } else {
+          auto error_text =  py::cast<std::string>(response.error);
+          errors[i] = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, error_text.c_str());
+        }
+      }
+      // GIL is released here - no further python object access in this function is allowed
+    }
+
+    // send responses. doing this out of previous 'copy' loop to avoid holding GIL during this
+    // operation.
+    for (uint32_t i = 0; i < request_count; ++i) {
+      auto err = TRITONBACKEND_ResponseSend(triton_responses[i], TRITONSERVER_RESPONSE_COMPLETE_FINAL, errors[i]);
+      LOG_IF_ERROR(err, "failed sending response");
+    }
+
+    uint64_t exec_end = timestamp_ns();
+
+    // log timing statistics for this request, and release it
+    for (uint32_t i = 0; i < request_count; ++i) {
+      auto request = triton_requests[i];
+      bool success = errors[i] == nullptr;
+      auto err = TRITONBACKEND_ModelInstanceReportStatistics(instance_, request, success,
+                                                             exec_start, compute_start,
+                                                             compute_end, exec_end);
+      LOG_IF_ERROR(err, "failed to report request statistics");
+
+      err = TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL);
+      LOG_IF_ERROR(err, "failed releasing request");
+    }
+
+    // report batch statistics. this backend (like the triton python_backend) doesn't support batching
+    // so the batch size is always 1
+    auto err = TRITONBACKEND_ModelInstanceReportBatchStatistics(instance_, 1,
+                                                                exec_start, compute_start,
+                                                                compute_end, exec_end);
+    LOG_IF_ERROR(err, "failed reporting batch request statistics");
+  }
 
  private:
-  ModelInstanceState(ModelState *model_state,
-                     TRITONBACKEND_ModelInstance *triton_model_instance,
-                     const char *name,
-                     const TRITONSERVER_InstanceGroupKind kind,
-                     const int32_t device_id);
-
   ModelState *model_state_;
-  TRITONBACKEND_ModelInstance *triton_model_instance_;
-  const std::string name_;
-  const TRITONSERVER_InstanceGroupKind kind_;
-  const int32_t device_id_;
+  TRITONBACKEND_ModelInstance * instance_;
+  std::string name_;
+  TRITONSERVER_InstanceGroupKind kind_;
+  int32_t device_id_;
+
+  py::object python_model;
 };
-
-TRITONSERVER_Error *
-ModelInstanceState::Create(ModelState *model_state,
-                           TRITONBACKEND_ModelInstance *triton_model_instance,
-                           ModelInstanceState **state) {
-  const char *instance_name;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceName(triton_model_instance, &instance_name));
-
-  TRITONSERVER_InstanceGroupKind instance_kind;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceKind(triton_model_instance, &instance_kind));
-
-  int32_t instance_id;
-  RETURN_IF_ERROR(
-      TRITONBACKEND_ModelInstanceDeviceId(triton_model_instance, &instance_id));
-
-  py::gil_scoped_acquire l;
-  *state = new ModelInstanceState(model_state, triton_model_instance,
-                                  instance_name, instance_kind, instance_id);
-
-  std::string path_workflow(model_state->Path());
-  path_workflow.append("/");
-  path_workflow.append(std::to_string(model_state->Version()));
-  path_workflow.append("/workflow");
-
-  const std::vector<TRITONSERVER_DataType> triton_dtypes =
-      model_state->OutputDtypes();
-  std::map<std::string, std::string> dtypes;
-  for (size_t i = 0; i < model_state->OutputNames().size(); i++) {
-    dtypes[model_state->OutputNames()[i]] =
-        Utils::ConvertToNumpyType(triton_dtypes[i]);
-  }
-
-  try {
-    (*state)->nvt.Deserialize(path_workflow, dtypes);
-  } catch (const py::error_already_set &e) {
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
-    return TRITONSERVER_ErrorNew(
-       TRITONSERVER_ERROR_INTERNAL,
-       e.what());
-  }
-  return nullptr;  // success
-}
-
-ModelInstanceState::ModelInstanceState(
-    ModelState *model_state, TRITONBACKEND_ModelInstance *triton_model_instance,
-    const char *name, const TRITONSERVER_InstanceGroupKind kind,
-    const int32_t device_id)
-    : model_state_(model_state), triton_model_instance_(triton_model_instance),
-      name_(name), kind_(kind), device_id_(device_id) {}
-
 }  // namespace nvtabular
 }  // namespace backend
 }  // namespace triton
