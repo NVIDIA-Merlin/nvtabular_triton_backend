@@ -103,3 +103,27 @@ def test_large_strings(tmpdir):
     features = ["description"] >> ops.Categorify()
     workflow = nvt.Workflow(features)
     _verify_workflow_on_tritonserver(tmpdir, workflow, df, "test_large_string")
+
+
+def test_numeric_dtypes(tmpdir):
+    dtypes = []
+    for width in [8, 16, 32, 64]:
+        dtype = f"int{width}"
+        dtypes.append((dtype, np.iinfo(dtype)))
+        dtype = f"uint{width}"
+        dtypes.append((dtype, np.iinfo(dtype)))
+
+    for width in [32, 64]:
+        dtype = f"float{width}"
+        dtypes.append((dtype, np.finfo(dtype)))
+
+    def check_dtypes(col):
+        assert str(col.dtype) == col.name
+        return col
+
+    # simple transform to make sure we can round-trip the min/max values for each dtype,
+    # through triton, with the 'transform' here just checking that the dtypes are correct
+    df = cudf.DataFrame({dtype: np.array([limits.max, 0, limits.min], dtype=dtype) for dtype, limits in dtypes})
+    features = nvt.ColumnGroup(df.columns) >> check_dtypes
+    workflow = nvt.Workflow(features)
+    _verify_workflow_on_tritonserver(tmpdir, workflow, df, "test_numeric_dtypes")

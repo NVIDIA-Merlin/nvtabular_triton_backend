@@ -83,19 +83,19 @@ class NVT_LOCAL NVTabular {
       std::tuple<std::string, std::string> desc("", "<i8");
       list_desc.append(desc);
     } else if (dtype == TRITONSERVER_TYPE_UINT8) {
-      ai["typestr"] = "<i1";
+      ai["typestr"] = "<u1";
       std::tuple<std::string, std::string> desc("", "<u1");
       list_desc.append(desc);
     } else if (dtype == TRITONSERVER_TYPE_UINT16) {
-      ai["typestr"] = "<i2";
+      ai["typestr"] = "<u2";
       std::tuple<std::string, std::string> desc("", "<u2");
       list_desc.append(desc);
     } else if (dtype == TRITONSERVER_TYPE_UINT32) {
-      ai["typestr"] = "<i4";
+      ai["typestr"] = "<u4";
       std::tuple<std::string, std::string> desc("", "<u4");
       list_desc.append(desc);
     } else if (dtype == TRITONSERVER_TYPE_UINT64) {
-      ai["typestr"] = "<i8";
+      ai["typestr"] = "<u8";
       std::tuple<std::string, std::string> desc("", "<u8");
       list_desc.append(desc);
     } else if (dtype == TRITONSERVER_TYPE_FP16) {
