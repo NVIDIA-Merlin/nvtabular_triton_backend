@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "triton/backend/backend_common.h"
+
 namespace triton {
 namespace backend {
 namespace nvtabular {

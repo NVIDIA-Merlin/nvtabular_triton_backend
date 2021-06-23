@@ -27,7 +27,6 @@
 #include "model_state.hpp"
 #include "model_inst_state.hpp"
 #include "triton_utils.hpp"
-
 #include "triton_python_backend_utils.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
@@ -184,7 +183,7 @@ TRITONBACKEND_ModelInstanceExecute(TRITONBACKEND_ModelInstance* instance, TRITON
   } catch (const std::exception & e) {
     // all requests failed (possibly a bug in the python model code). return errors for each
     // request and cleanup
-    LOG_MESSAGE(TRITONSERVER_LOG_ERROR, e.what());
+    LOG(TRITONSERVER_LOG_ERROR) << "Exception during transform_requests '" << e.what() << "'";
     auto err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, e.what());
 
     for (uint32_t i = 0; i < request_count; ++i) {
@@ -195,7 +194,12 @@ TRITONBACKEND_ModelInstanceExecute(TRITONBACKEND_ModelInstance* instance, TRITON
       LOG_IF_ERROR(TRITONBACKEND_RequestRelease(requests[i], TRITONSERVER_REQUEST_RELEASE_ALL),
                   "Failed to release request");
     }
-    return err;
+
+    // Note: we're purposefully not returning an Err here. (Doing so seems to segfault the
+    // tritonserver process when it tries to respond the error  UNLESS we also don't release
+    // the request (which means that on shutting down tritonserver is slow / maybe leaks memory ))
+    // Since we've already sent an error response w/ ResponseSend this seems to be ok
+    return nullptr;
   }
 }
 }  // extern "C"
