@@ -38,7 +38,6 @@
 namespace triton {
 namespace backend {
 namespace nvtabular {
-
 class ModelState {
  public:
   explicit ModelState(TRITONBACKEND_Model *triton_model)
@@ -50,11 +49,21 @@ class ModelState {
     size_t byte_size;
     check_triton(TRITONSERVER_MessageSerializeToJson(config_message, &buffer, &byte_size));
     model_config_.assign(buffer, byte_size);
-    check_triton(TRITONSERVER_MessageDelete(config_message));
 
     const char *model_name;
     check_triton(TRITONBACKEND_ModelName(triton_model, &model_name));
     name_ = model_name;
+
+    // get the python module name to use from the model config
+    common::TritonJson::Value model_json;
+    check_triton(model_json.Parse(buffer, byte_size));
+    common::TritonJson::Value parameters;
+    if (model_json.Find("parameters", &parameters)) {
+      common::TritonJson::Value python_module_json;
+      if (parameters.Find("python_module", &python_module_json)) {
+        check_triton(python_module_json.MemberAsString("string_value", &python_module_));
+      }
+    }
 
     check_triton(TRITONBACKEND_ModelVersion(triton_model, &version_));
     check_triton(TRITONBACKEND_ModelServer(triton_model, &triton_server_));
@@ -63,6 +72,7 @@ class ModelState {
     const char *path;
     check_triton(TRITONBACKEND_ModelRepository(triton_model, &artifact_type, &path));
     path_ = path;
+    check_triton(TRITONSERVER_MessageDelete(config_message));
   }
 
   // Get the handle to the TRITONBACKEND model.
@@ -73,6 +83,7 @@ class ModelState {
   uint64_t Version() const { return version_; }
   const std::string & Path() const { return path_; }
   const std::string & ModelConfig() { return model_config_; }
+  const std::string & PythonModule() { return python_module_; }
 
  private:
   TRITONSERVER_Server *triton_server_;
@@ -81,6 +92,7 @@ class ModelState {
   uint64_t version_;
   std::string path_;
   std::string model_config_;
+  std::string python_module_;
 };
 
 }  // namespace nvtabular

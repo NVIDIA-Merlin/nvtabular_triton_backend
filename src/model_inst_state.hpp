@@ -60,9 +60,27 @@ class NVT_LOCAL ModelInstanceState {
 
     // Create the TritonPythonModel and initialize it from the model state
     py::gil_scoped_acquire l;
-    py::object module = py::module_::import("nvtabular.inference.triton.model");
-    python_model = module.attr("TritonPythonModel")();
+    auto python_module = model_state_->PythonModule();
+    auto path = model_state_->Path();
+    auto version = model_state_->Version();
 
+    py::object module;
+    if (python_module.size() > 0) {
+      // if we've been given a python module name in the model_config parameters use that
+      LOG(TRITONSERVER_LOG_INFO) << "Loading TritonPythonModel from module '" << python_module << "'";
+      module = py::module_::import(python_module.c_str());
+    } else {
+      // otherwise default to the 'model.py' file bundled with the triton model
+      std::stringstream model_path;
+      model_path << path << "/" << version;
+      LOG(TRITONSERVER_LOG_INFO) << "Loading TritonPythonnModel from model.py in path '" << model_path.str() << "'";
+      py::object sys = py::module_::import("sys");
+      sys.attr("path").attr("insert")(0, model_path.str());
+      module = py::module_::import("model");
+    }
+
+    // initialize the model
+    python_model = module.attr("TritonPythonModel")();
     py::dict args;
     args["model_config"] = model_state_->ModelConfig();
     args["model_version"] = model_state_->Version();
