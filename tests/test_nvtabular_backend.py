@@ -84,11 +84,13 @@ def test_error_handling(tmpdir):
 
     with run_triton_server(tmpdir) as client:
         inputs = nvt_triton.convert_df_to_triton_input(["x", "y"], df[:2])
-        with pytest.raises(tritonclient.utils.InferenceServerException) as exception_info:
-            client.infer(model_name, inputs)
-
-        assert "ValueError: Lets cause some problems" in str(exception_info.value)
-
+        # previously had a bug where an exception would segfault the tritonserver process
+        #  - but since this happened AFTER the response was sent, just testing this once
+        # isn't sufficient, so lets verify that we can get an error back several times
+        for _ in range(3):
+            with pytest.raises(tritonclient.utils.InferenceServerException) as exception_info:
+                client.infer(model_name, inputs)
+            assert "ValueError: Lets cause some problems" in str(exception_info.value)
 
 def test_tritonserver_inference_string(tmpdir):
     df = cudf.DataFrame({"user": ["aaaa", "bbbb", "cccc", "aaaa", "bbbb", "aaaa"]})
