@@ -27,7 +27,6 @@
 #include "model_state.hpp"
 #include "model_inst_state.hpp"
 #include "triton_utils.hpp"
-
 #include "triton_python_backend_utils.hpp"
 
 namespace triton { namespace backend { namespace nvtabular {
