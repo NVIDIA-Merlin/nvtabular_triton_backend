@@ -72,7 +72,11 @@ class NVT_LOCAL ModelInstanceState {
     py::dict args;
     args["model_config"] = model_state_->ModelConfig();
     args["model_version"] = model_state_->Version();
+    args["model_name"] = model_state_->Name();
     args["model_repository"] = model_state_->Path();
+    args["model_instance_kind"] = TRITONSERVER_InstanceGroupKindString(kind_);
+    args["model_instance_name"] = name_;
+    args["model_instance_device_id"] = std::to_string(device_id_);
     python_model.attr("initialize")(args);
   }
 
