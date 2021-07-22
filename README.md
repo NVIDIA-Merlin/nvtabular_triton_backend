@@ -32,19 +32,10 @@ $ cd nvtabular_triton_backend/
 $ mkdir build
 $ cd build
 $ cmake ..
-$ make install
-$ mkdir /opt/tritonserver/nvtabular
-$ cp libtriton_nvtabular.so /opt/tritonserver/nvtabular/
+$ make -j 4
+$ mkdir /opt/tritonserver/backends/nvtabular
+$ cp libtriton_nvtabular.so /opt/tritonserver/backends/nvtabular/
 ```
-
-Before start serving a model with nvtabular backend, run the following command;
-
-```
-$ export LD_LIBRARY_PATH=/conda/envs/merlin/lib/:$LD_LIBRARY_PATH
-```
-
-If the path of the libraries (i.e. python libs) has already been added to the `LD_LIBRARY_PATH`,
-you don't have to run the command above.
 
 The model that will use NVTabular C++ backend should have the following in the
 config.pbtxt file
