@@ -58,9 +58,9 @@ TRITONBACKEND_Initialize(TRITONBACKEND_Backend* backend) {
 
   if ((api_version_major != TRITONBACKEND_API_VERSION_MAJOR) ||
       (api_version_minor < TRITONBACKEND_API_VERSION_MINOR)) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        "triton backend API version does not support this backend");
+    LOG(TRITONSERVER_LOG_WARN) << "Triton backend API version mismatch. Compiled with v"
+      << TRITONBACKEND_API_VERSION_MAJOR << "." << TRITONBACKEND_API_VERSION_MINOR
+      << " but tritonserver api is v" << api_version_major << "." << api_version_minor;
   }
 
   // Force opening of libpython - so that it's available globally for c-extension modules
